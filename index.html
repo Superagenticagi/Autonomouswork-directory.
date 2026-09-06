@@ -1,17 +1,41 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <title>Autonomous Work Directory</title>
-    <link rel="stylesheet" href="style.css">
-  </head>
-  <body>
-    <nav>
-  <a href="index.html">Home</a>
-  <a href="agents.html">Agents</a>
-  <a href="tools.html">Tools</a>
-    </nav>
-    <h1>Site is live!</h1>
-    <a href="agents.html">Agents Directory</a>
-    <a href="tools.html">Tools Directory</a>
-  </body>
+<head>
+  <title>AI Directory</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f4f4f4; padding: 20px; }
+    h1 { text-align: center; }
+    .card { background: #fff; padding: 15px; margin: 10px auto; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); max-width: 600px; }
+    .card h2 { margin: 0; }
+    .card a { color: #007acc; text-decoration: none; }
+    .card a:hover { text-decoration: underline; }
+    .category { font-size: 0.9em; color: #555; }
+  </style>
+</head>
+<body>
+  <h1>AI Directory</h1>
+  <div id="directory"></div>
+
+  <script>
+    async function loadDirectory() {
+      // Replace with your Worker URL
+      const res = await fetch("https://raspy-brook-525d.superagentic.workers.dev/");
+      const data = await res.json();
+      const container = document.getElementById("directory");
+
+      data.forEach(item => {
+        const card = document.createElement("div");
+        card.className = "card";
+        card.innerHTML = `
+          <h2>${item.Name}</h2>
+          <div class="category">${item.Category}</div>
+          <p>${item.Description}</p>
+          <p><a href="${item.URL}" target="_blank">${item.URL}</a></p>
+        `;
+        container.appendChild(card);
+      });
+    }
+    loadDirectory();
+  </script>
+</body>
 </html>
