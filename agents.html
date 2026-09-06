@@ -1,38 +1,81 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <title>Agents Directory</title>
-    <link rel="stylesheet" href="style.css">
-  </head>
-  <body>
-    <nav>
-  <a href="index.html">Home</a>
-  <a href="agents.html">Agents</a>
-  <a href="tools.html">Tools</a>
-</nav>
-    <h1>Agents Directory</h1>
-     <h2>Featured Agents</h2>
-<table border="1" cellpadding="8">
-  <tr>
-    <th>Name</th>
-    <th>Category</th>
-    <th>Description</th>
-  </tr>
-  <tr>
-    <td>Agent Alpha</td>
-    <td>Automation</td>
-    <td>Handles workflow automation tasks</td>
-  </tr>
-  <tr>
-    <td>Agent Beta</td>
-    <td>Analytics</td>
-    <td>Processes and analyzes datasets</td>
-  </tr>
-  <tr>
-    <td>Agent Gamma</td>
-    <td>Content</td>
-    <td>Generates text and media</td>
-  </tr>
-</table>
-  </body>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>AI Agents Directory</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 40px;
+      background: #f9f9f9;
+    }
+    h1 {
+      text-align: center;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+      background: #fff;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 12px;
+      text-align: left;
+    }
+    th {
+      background: #333;
+      color: #fff;
+    }
+    tr:nth-child(even) {
+      background: #f2f2f2;
+    }
+    a {
+      color: #0066cc;
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <h1>AI Agents Directory</h1>
+  <table id="directory">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Category</th>
+        <th>Description</th>
+        <th>URL</th>
+      </tr>
+    </thead>
+    <tbody>
+      <!-- Rows will be injected here -->
+    </tbody>
+  </table>
+
+  <script>
+    async function loadDirectory() {
+      const res = await fetch("https://raspy-brook-525d.superagentic.workers.dev/"); // replace with your Worker URL
+      const data = await res.json();
+      const tbody = document.querySelector("#directory tbody");
+
+      tbody.innerHTML = "";
+
+      data.forEach(item => {
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td>${item.Name || ""}</td>
+          <td>${item.Category || ""}</td>
+          <td>${item.Description || ""}</td>
+          <td><a href="${item.URL}" target="_blank">${item.URL || ""}</a></td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    loadDirectory();
+  </script>
+</body>
 </html>
