@@ -1,17 +1,48 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <title>Autonomous Work Directory</title>
-    <link rel="stylesheet" href="style.css">
-  </head>
-  <body>
-    <nav>
-  <a href="index.html">Home</a>
-  <a href="agents.html">Agents</a>
-  <a href="tools.html">Tools</a>
-    </nav>
-    <h1>Site is live!</h1>
-    <a href="agents.html">Agents Directory</a>
-    <a href="tools.html">Tools Directory</a>
-  </body>
+<head>
+  <title>Autonomous Work Directory</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <nav>
+    <a href="index.html">Home</a>
+    <a href="agents.html">Agents</a>
+    <a href="tools.html">Tools</a>
+  </nav>
+
+  <h1>Autonomous Work Directory</h1>
+
+  <table id="directory">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Category</th>
+        <th>Description</th>
+        <th>URL</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <script>
+    async function loadDirectory() {
+      const res = await fetch("https://raspy-brook-525d.superagentic.workers.dev/"); // replace with your Worker URL
+      const data = await res.json();
+      const tbody = document.querySelector("#directory tbody");
+
+      data.forEach(item => {
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td>${item.Name || ""}</td>
+          <td>${item.Category || ""}</td>
+          <td>${item.Description || ""}</td>
+          <td><a href="${item.URL}" target="_blank">${item.URL || ""}</a></td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+    loadDirectory();
+  </script>
+</body>
 </html>
