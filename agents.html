@@ -6,24 +6,26 @@
   <title>Autonomous AI Agents | Autonomous Work</title>
   <link rel="stylesheet" href="style.css" />
   <style>
-    /* Larger, more comfortable filter buttons */
+    /* Filters row fix */
     .filters {
       display: flex;
-      flex-wrap: wrap;
-      justify-content: center; /* center buttons */
-      gap: 12px;               /* more space between buttons */
-      margin-bottom: 28px;
+      justify-content: flex-start; /* align left like homepage */
+      gap: 10px;                   /* small gap between buttons */
+      margin: 20px 0;
+      flex-wrap: nowrap;           /* keep in one row */
+      overflow-x: auto;            /* allow horizontal scroll if too many */
     }
 
     .filter {
       border: 1px solid var(--border);
       background: transparent;
       color: var(--muted);
-      padding: 10px 20px;   /* increased padding */
+      padding: 8px 16px;   /* balanced padding */
       border-radius: 999px;
       cursor: pointer;
       font: inherit;
-      font-size: 1rem;      /* slightly larger text */
+      font-size: 0.95rem;  /* slightly larger text */
+      white-space: nowrap; /* prevent text wrapping */
     }
 
     .filter:hover,
@@ -37,7 +39,7 @@
     .discoveries-section {
       max-width: 1200px;
       margin: auto;
-      padding: 60px 24px; /* balanced padding, not too wide */
+      padding: 40px 24px; /* balanced padding */
     }
   </style>
 </head>
