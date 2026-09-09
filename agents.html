@@ -19,26 +19,9 @@
       <p class="subtitle">Agents built to perform tasks and workflows with greater autonomy.</p>
     </header>
 
-    <section class="discoveries-section">
-  <div class="section-header">
-    <h2><span>Autonomous</span> Agents</h2>
-    <p>Agents built to perform tasks and workflows with greater autonomy.</p>
-  </div>
-
-  <div class="discoveries-grid">
-    <!-- Example card -->
-    <div class="discovery-card">
-      <div class="discovery-top">
-        <span class="discovery-category">Research</span>
-        <span class="discovery-arrow">→</span>
-      </div>
-      <h3>Agent Name</h3>
-      <p>Agent description goes here.</p>
-      <a href="#">Visit</a>
-    </div>
-    <!-- Repeat discovery-card for each agent -->
-  </div>
-    </section>
+    <div id="status">Loading agents...</div>
+<div class="filters" id="filters"></div>
+<div class="grid" id="items"></div>
 
   <script>
     const WORKER_URL = "https://raspy-brook-525d.superagentic.workers.dev/";
