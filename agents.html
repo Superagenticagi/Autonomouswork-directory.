@@ -7,21 +7,32 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div class="container">
-    <nav class="site-nav">
-      <a href="index.html">Home</a>
-      <a href="agents.html" class="active">Agents</a>
-      <a href="tools.html">Tools</a>
-    </nav>
+  <!-- Futuristic Navbar -->
+  <div class="navbar">
+    <div class="nav-container">
+      <div class="brand">
+        <span class="brand-icon">⚡</span>
+        <strong>Autonomous Work</strong>
+      </div>
+      <div class="nav-links">
+        <a href="index.html">Home</a>
+        <a href="agents.html" class="active">Agents</a>
+        <a href="tools.html">Tools</a>
+      </div>
+    </div>
+  </div>
 
-    <header>
-      <h1>Autonomous AI Agents</h1>
-      <p class="subtitle">Agents built to perform tasks and workflows with greater autonomy.</p>
-    </header>
+  <!-- Page Content Block -->
+  <div class="discoveries-section">
+    <div class="section-header">
+      <h2><span>Autonomous</span> Agents</h2>
+      <p>Agents built to perform tasks and workflows with greater autonomy.</p>
+    </div>
 
-    <div id="status">Loading agents...</div>
-<div class="filters" id="filters"></div>
-<div class="grid" id="items"></div>
+    <div id="status" class="directory-status">Loading agents...</div>
+    <div class="filters" id="filters"></div>
+    <div class="discoveries-grid" id="items"></div>
+  </div>
 
   <script>
     const WORKER_URL = "https://raspy-brook-525d.superagentic.workers.dev/";
@@ -38,15 +49,15 @@
       }
 
       itemsEl.innerHTML = items.map(item => `
-        <article class="card">
-          <h2>
-            <a href="${item.URL || item.url || '#'}" target="_blank" rel="noopener noreferrer">
-              ${item.Name || item.name || "Untitled"}
-            </a>
-          </h2>
+        <div class="discovery-card">
+          <div class="discovery-top">
+            <span class="discovery-category">${item.Category || item.category || "Uncategorized"}</span>
+            <span class="discovery-arrow">→</span>
+          </div>
+          <h3>${item.Name || item.name || "Untitled"}</h3>
           <p>${item.Description || item.description || ""}</p>
-          <span class="badge">${item.Category || item.category || "Uncategorized"}</span>
-        </article>
+          <a href="${item.URL || item.url || '#'}" target="_blank" rel="noopener noreferrer">Visit</a>
+        </div>
       `).join("");
     }
 
