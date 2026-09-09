@@ -3,157 +3,111 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Autonomous Work Directory</title>
-  <style>
-    :root {
-      --bg: #0f172a;
-      --card: #1e293b;
-      --text: #f1f5f9;
-      --muted: #94a3b8;
-      --accent: #38bdf8;
-      --border: #334155;
-    }
-
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-
-    body {
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      line-height: 1.5;
-      padding: 40px 20px;
-    }
-
-    .container {
-      max-width: 1100px;
-      margin: 0 auto;
-    }
-
-    header {
-      text-align: center;
-      margin-bottom: 50px;
-    }
-
-    h1 {
-      font-size: 2.4rem;
-      margin-bottom: 12px;
-      background: linear-gradient(90deg, #38bdf8, #818cf8);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-
-    .subtitle {
-      color: var(--muted);
-      font-size: 1.1rem;
-    }
-
-    #status {
-      text-align: center;
-      color: var(--muted);
-      margin-bottom: 30px;
-      font-size: 0.95rem;
-    }
-
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-      gap: 24px;
-    }
-
-    .card {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 24px;
-      transition: transform 0.2s, border-color 0.2s;
-    }
-
-    .card:hover {
-      transform: translateY(-4px);
-      border-color: var(--accent);
-    }
-
-    .card h3 {
-      font-size: 1.25rem;
-      margin-bottom: 10px;
-    }
-
-    .card h3 a {
-      color: var(--text);
-      text-decoration: none;
-    }
-
-    .card h3 a:hover {
-      color: var(--accent);
-    }
-
-    .card p {
-      color: var(--muted);
-      font-size: 0.95rem;
-      margin-bottom: 16px;
-    }
-
-    .badge {
-      display: inline-block;
-      background: rgba(56, 189, 248, 0.15);
-      color: var(--accent);
-      font-size: 0.8rem;
-      padding: 4px 10px;
-      border-radius: 999px;
-      font-weight: 500;
-    }
-  </style>
+  <title>Autonomous AI Agents | Autonomous Work</title>
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <div class="container">
+    <nav class="site-nav">
+      <a href="index.html">Home</a>
+      <a href="agents.html" class="active">Agents</a>
+      <a href="tools.html">Tools</a>
+    </nav>
+
     <header>
-      <h1>Autonomous Work Directory</h1>
-      <p class="subtitle">Latest autonomous AI agents & enterprise workflow tools</p>
+      <h1>Autonomous AI Agents</h1>
+      <p class="subtitle">Agents built to perform tasks and workflows with greater autonomy.</p>
     </header>
 
-    <div id="status">Loading tools...</div>
-    <div class="grid" id="tools"></div>
+    <div id="status">Loading agents...</div>
+    <div class="filters" id="filters"></div>
+    <div class="grid" id="items"></div>
   </div>
 
   <script>
     const WORKER_URL = "https://raspy-brook-525d.superagentic.workers.dev/";
+    const ITEM_TYPE = "Agent";
+    let allItems = [];
+    let activeCategory = "All";
 
-    async function loadTools() {
+    function render(items) {
+      const itemsEl = document.getElementById("items");
+
+      if (!items.length) {
+        itemsEl.innerHTML = '<div class="empty">No autonomous agents found.</div>';
+        return;
+      }
+
+      itemsEl.innerHTML = items.map(item => `
+        <article class="card">
+          <h2>
+            <a href="${item.URL || item.url || '#'}" target="_blank" rel="noopener noreferrer">
+              ${item.Name || item.name || "Untitled"}
+            </a>
+          </h2>
+          <p>${item.Description || item.description || ""}</p>
+          <span class="badge">${item.Category || item.category || "Uncategorized"}</span>
+        </article>
+      `).join("");
+    }
+
+    function renderFilters(items) {
+      const filtersEl = document.getElementById("filters");
+      const categories = [...new Set(
+        items.map(item => item.Category || item.category || "Uncategorized")
+      )].sort();
+
+      filtersEl.innerHTML = ["All", ...categories].map(category => `
+        <button class="filter ${category === activeCategory ? "active" : ""}" data-category="${category}">
+          ${category}
+        </button>
+      `).join("");
+
+      filtersEl.querySelectorAll(".filter").forEach(button => {
+        button.addEventListener("click", () => {
+          activeCategory = button.dataset.category;
+
+          filtersEl.querySelectorAll(".filter").forEach(btn =>
+            btn.classList.toggle("active", btn === button)
+          );
+
+          const filtered = activeCategory === "All"
+            ? allItems
+            : allItems.filter(item =>
+                (item.Category || item.category || "Uncategorized") === activeCategory
+              );
+
+          render(filtered);
+        });
+      });
+    }
+
+    async function loadItems() {
       const statusEl = document.getElementById("status");
-      const toolsEl = document.getElementById("tools");
 
       try {
         const res = await fetch(WORKER_URL);
         if (!res.ok) throw new Error("Network response was not ok");
 
-        const tools = await res.json();
+        const data = await res.json();
 
-        if (!Array.isArray(tools) || tools.length === 0) {
-          statusEl.textContent = "No tools found.";
-          return;
-        }
+        allItems = Array.isArray(data)
+          ? data.filter(item => (item.Type || item.type || "") === ITEM_TYPE)
+          : [];
 
-        statusEl.textContent = `Showing ${tools.length} tools • Updated from Airtable`;
+        statusEl.textContent = `${allItems.length} agents`;
 
-        toolsEl.innerHTML = tools.map(tool => `
-          <div class="card">
-            <h3>
-              <a href="${tool.URL || tool.url || '#'}" target="_blank" rel="noopener">
-                ${tool.Name || tool.name || "Untitled"}
-              </a>
-            </h3>
-            <p>${tool.Description || tool.description || ""}</p>
-            <span class="badge">${tool.Category || tool.category || "Automation"}</span>
-          </div>
-        `).join("");
-
+        renderFilters(allItems);
+        render(allItems);
       } catch (err) {
         console.error(err);
-        statusEl.textContent = "Failed to load tools. Please try again later.";
+        statusEl.textContent = "Unable to load this directory right now.";
+        document.getElementById("items").innerHTML =
+          '<div class="empty">Please try again later.</div>';
       }
     }
 
-    loadTools();
+    loadItems();
   </script>
 </body>
 </html>
