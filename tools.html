@@ -1,38 +1,113 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <title>Tools Directory</title>
-    <link rel="stylesheet" href="style.css">
-  </head>
-  <body>
-    <nav>
-  <a href="index.html">Home</a>
-  <a href="agents.html">Agents</a>
-  <a href="tools.html">Tools</a>
-</nav>
-    <h1>Tools Directory</h1>
-    <h2>Workflow Tools</h2>
-<table border="1" cellpadding="8">
-  <tr>
-    <th>Name</th>
-    <th>Type</th>
-    <th>Use Case</th>
-  </tr>
-  <tr>
-    <td>Airtable</td>
-    <td>Database</td>
-    <td>API integration + data storage</td>
-  </tr>
-  <tr>
-    <td>Zapier</td>
-    <td>Automation</td>
-    <td>Connects apps and automates workflows</td>
-  </tr>
-  <tr>
-    <td>Cloudflare Pages</td>
-    <td>Hosting</td>
-    <td>Deploys static websites</td>
-  </tr>
-</table>
-  </body>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Autonomous Work Tools | Autonomous Work</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <nav class="site-nav">
+      <a href="index.html">Home</a>
+      <a href="agents.html">Agents</a>
+      <a href="tools.html" class="active">Tools</a>
+    </nav>
+
+    <header>
+      <h1>Autonomous Work Tools</h1>
+      <p class="subtitle">Tools that support automation, orchestration, infrastructure, and autonomous workflows.</p>
+    </header>
+
+    <div id="status">Loading tools...</div>
+    <div class="filters" id="filters"></div>
+    <div class="grid" id="items"></div>
+  </div>
+
+  <script>
+    const WORKER_URL = "https://raspy-brook-525d.superagentic.workers.dev/";
+    const ITEM_TYPE = "Tool";
+    let allItems = [];
+    let activeCategory = "All";
+
+    function render(items) {
+      const itemsEl = document.getElementById("items");
+
+      if (!items.length) {
+        itemsEl.innerHTML = '<div class="empty">No autonomous work tools found.</div>';
+        return;
+      }
+
+      itemsEl.innerHTML = items.map(item => `
+        <article class="card">
+          <h2>
+            <a href="${item.URL || item.url || '#'}" target="_blank" rel="noopener noreferrer">
+              ${item.Name || item.name || "Untitled"}
+            </a>
+          </h2>
+          <p>${item.Description || item.description || ""}</p>
+          <span class="badge">${item.Category || item.category || "Uncategorized"}</span>
+        </article>
+      `).join("");
+    }
+
+    function renderFilters(items) {
+      const filtersEl = document.getElementById("filters");
+      const categories = [...new Set(
+        items.map(item => item.Category || item.category || "Uncategorized")
+      )].sort();
+
+      filtersEl.innerHTML = ["All", ...categories].map(category => `
+        <button class="filter ${category === activeCategory ? "active" : ""}" data-category="${category}">
+          ${category}
+        </button>
+      `).join("");
+
+      filtersEl.querySelectorAll(".filter").forEach(button => {
+        button.addEventListener("click", () => {
+          activeCategory = button.dataset.category;
+
+          filtersEl.querySelectorAll(".filter").forEach(btn =>
+            btn.classList.toggle("active", btn === button)
+          );
+
+          const filtered = activeCategory === "All"
+            ? allItems
+            : allItems.filter(item =>
+                (item.Category || item.category || "Uncategorized") === activeCategory
+              );
+
+          render(filtered);
+        });
+      });
+    }
+
+    async function loadItems() {
+      const statusEl = document.getElementById("status");
+
+      try {
+        const res = await fetch(WORKER_URL);
+        if (!res.ok) throw new Error("Network response was not ok");
+
+        const data = await res.json();
+
+        allItems = Array.isArray(data)
+          ? data.filter(item => (item.Type || item.type || "") === ITEM_TYPE)
+          : [];
+
+        statusEl.textContent = `${allItems.length} tools`;
+
+        renderFilters(allItems);
+        render(allItems);
+      } catch (err) {
+        console.error(err);
+        statusEl.textContent = "Unable to load this directory right now.";
+        document.getElementById("items").innerHTML =
+          '<div class="empty">Please try again later.</div>';
+      }
+    }
+
+    loadItems();
+  </script>
+</body>
 </html>
