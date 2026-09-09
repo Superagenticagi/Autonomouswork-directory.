@@ -6,17 +6,20 @@
   <title>Autonomous AI Agents | Autonomous Work</title>
   <link rel="stylesheet" href="style.css" />
   <style>
-    /* Extra spacing for content block */
-    .discoveries-section {
-      padding: 60px 40px;
+    /* Larger, more comfortable filter buttons */
+    .filters {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center; /* center buttons */
+      gap: 12px;               /* more space between buttons */
+      margin-bottom: 28px;
     }
 
-    /* Larger, more comfortable filter buttons */
     .filter {
       border: 1px solid var(--border);
       background: transparent;
       color: var(--muted);
-      padding: 10px 18px;   /* increased padding */
+      padding: 10px 20px;   /* increased padding */
       border-radius: 999px;
       cursor: pointer;
       font: inherit;
@@ -28,6 +31,13 @@
       color: var(--text);
       border-color: var(--accent);
       background: rgba(56, 189, 248, 0.1);
+    }
+
+    /* Keep section aligned like homepage */
+    .discoveries-section {
+      max-width: 1200px;
+      margin: auto;
+      padding: 60px 24px; /* balanced padding, not too wide */
     }
   </style>
 </head>
