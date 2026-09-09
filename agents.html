@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Autonomous AI Agents | Autonomous Work</title>
-  <link rel="stylesheet" href="style-agent.css" />
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <div class="container">
@@ -19,10 +19,26 @@
       <p class="subtitle">Agents built to perform tasks and workflows with greater autonomy.</p>
     </header>
 
-    <div id="status">Loading agents...</div>
-    <div class="filters" id="filters"></div>
-    <div class="grid" id="items"></div>
+    <section class="discoveries-section">
+  <div class="section-header">
+    <h2><span>Autonomous</span> Agents</h2>
+    <p>Agents built to perform tasks and workflows with greater autonomy.</p>
   </div>
+
+  <div class="discoveries-grid">
+    <!-- Example card -->
+    <div class="discovery-card">
+      <div class="discovery-top">
+        <span class="discovery-category">Research</span>
+        <span class="discovery-arrow">→</span>
+      </div>
+      <h3>Agent Name</h3>
+      <p>Agent description goes here.</p>
+      <a href="#">Visit</a>
+    </div>
+    <!-- Repeat discovery-card for each agent -->
+  </div>
+    </section>
 
   <script>
     const WORKER_URL = "https://raspy-brook-525d.superagentic.workers.dev/";
