@@ -1,125 +1,451 @@
+
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
+
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Autonomous Work Tools | Autonomous Work</title>
-  <link rel="stylesheet" href="style.css" />
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  />
+
+  <meta
+    name="description"
+    content="Discover tools for automation, orchestration, infrastructure, memory, databases, communication and autonomous workflows."
+  />
+
+  <title>Autonomous Work Tools | Autonomous Work Space</title>
+
+  <link
+    rel="stylesheet"
+    href="style.css"
+  />
+
 </head>
+
+
 <body>
-  <!-- Futuristic Navbar -->
-  <div class="navbar">
+
+  <!-- Background Effects -->
+
+  <div class="background-glow glow-one"></div>
+  <div class="background-glow glow-two"></div>
+
+
+  <!-- Navigation -->
+
+  <nav class="navbar">
+
     <div class="nav-container">
-      <div class="brand">
-        <span class="brand-icon">⚡</span>
-        <strong>Autonomous Work Space</strong>
-      </div>
+
+      <a
+        href="index.html"
+        class="brand"
+      >
+
+        <span class="brand-icon">
+          ◉
+        </span>
+
+        <span>
+          Autonomous
+          <strong>Work Space</strong>
+        </span>
+
+      </a>
+
+
       <div class="nav-links">
-        <a href="index.html">Home</a>
-        <a href="agents.html">Agents</a>
-        <a href="tools.html" class="active">Tools</a>
-        <a href="stack.html">Stack</a>
-        <a href="workflows.html">Workflows</a>
+
+        <a href="index.html">
+          Home
+        </a>
+
+        <a href="agents.html">
+          Agents
+        </a>
+
+        <a
+          href="tools.html"
+          class="active"
+        >
+          Tools
+        </a>
+
+        <a href="stack.html">
+          Stack
+        </a>
+
+        <a href="workflows.html">
+          Workflows
+        </a>
+
       </div>
-    </div>
-  </div>
 
-  <!-- Page Content Block -->
-  <div class="discoveries-section">
-    <div class="section-header">
-      <h2><span>Autonomous</span> Tools</h2>
-      <p>Tools that support automation, orchestration, infrastructure, and autonomous workflows.</p>
     </div>
 
-    <div id="status" class="directory-status">Loading tools...</div>
-    <div class="filters" id="filters"></div>
-    <div class="discoveries-grid" id="items"></div>
-  </div>
+  </nav>
+
+
+
+  <main>
+
+    <section class="section discoveries-section">
+
+
+      <div class="section-header">
+
+        <div>
+
+          <div class="section-label">
+
+            AUTONOMOUS WORK
+
+          </div>
+
+
+          <h1>
+
+            <span>Tools</span> & Infrastructure
+
+          </h1>
+
+        </div>
+
+
+        <p>
+
+          Explore the tools and systems that provide
+          automation, orchestration, infrastructure,
+          memory and other capabilities for autonomous work.
+
+        </p>
+
+      </div>
+
+
+
+      <div
+        id="status"
+        class="directory-status"
+      >
+
+        Loading tools...
+
+      </div>
+
+
+      <div
+        class="filters"
+        id="filters"
+      ></div>
+
+
+      <div
+        class="discoveries-grid"
+        id="items"
+      ></div>
+
+
+    </section>
+
+  </main>
+
+
+
+  <!-- Footer -->
+
+  <footer>
+
+    <div class="footer-brand">
+
+      <span class="brand-icon">
+        ◉
+      </span>
+
+      Autonomous Work Space
+
+    </div>
+
+
+    <p>
+
+      Tools for building autonomous work systems.
+
+    </p>
+
+  </footer>
+
+
 
   <script>
-    const WORKER_URL = "https://raspy-brook-525d.superagentic.workers.dev/";
-    const ITEM_TYPE = "Tool";
+
+    const WORKER_URL =
+      "https://raspy-brook-525d.superagentic.workers.dev/";
+
+
+    const ITEM_TYPE =
+      "Tool";
+
+
     let allItems = [];
-    let activeCategory = "All";
+
+    let activeCategory =
+      "All";
+
+
 
     function render(items) {
-      const itemsEl = document.getElementById("items");
+
+      const itemsEl =
+        document.getElementById(
+          "items"
+        );
+
 
       if (!items.length) {
-        itemsEl.innerHTML = '<div class="empty">No autonomous work tools found.</div>';
+
+        itemsEl.innerHTML =
+          '<div class="empty">No autonomous work tools found.</div>';
+
         return;
+
       }
 
-      itemsEl.innerHTML = items.map(item => `
-        <div class="discovery-card">
-          <div class="discovery-top">
-            <span class="discovery-category">${item.Category || item.category || "Uncategorized"}</span>
-            <span class="discovery-arrow">→</span>
-          </div>
-          <h3>${item.Name || item.name || "Untitled"}</h3>
-          <p>${item.Description || item.description || ""}</p>
-          <a href="${item.URL || item.url || '#'}" target="_blank" rel="noopener noreferrer">Visit</a>
-        </div>
-      `).join("");
+
+      itemsEl.innerHTML =
+        items.map(item => `
+
+          <article class="discovery-card">
+
+            <div class="discovery-top">
+
+              <span class="discovery-category">
+
+                ${item.Category ||
+                  item.category ||
+                  "Uncategorized"}
+
+              </span>
+
+              <span class="discovery-arrow">
+                ↗
+              </span>
+
+            </div>
+
+
+            <h3>
+
+              ${item.Name ||
+                item.name ||
+                "Untitled"}
+
+            </h3>
+
+
+            <p>
+
+              ${item.Description ||
+                item.description ||
+                ""}
+
+            </p>
+
+
+            <a
+              href="${item.URL ||
+                item.url ||
+                "#"}"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+
+              Visit
+              →
+
+            </a>
+
+          </article>
+
+        `).join("");
+
     }
+
+
 
     function renderFilters(items) {
-      const filtersEl = document.getElementById("filters");
-      const categories = [...new Set(
-        items.map(item => item.Category || item.category || "Uncategorized")
-      )].sort();
 
-      filtersEl.innerHTML = ["All", ...categories].map(category => `
-        <button class="filter ${category === activeCategory ? "active" : ""}" data-category="${category}">
-          ${category}
-        </button>
-      `).join("");
+      const filtersEl =
+        document.getElementById(
+          "filters"
+        );
 
-      filtersEl.querySelectorAll(".filter").forEach(button => {
-        button.addEventListener("click", () => {
-          activeCategory = button.dataset.category;
 
-          filtersEl.querySelectorAll(".filter").forEach(btn =>
-            btn.classList.toggle("active", btn === button)
+      const categories =
+        [
+          ...new Set(
+
+            items.map(item =>
+              item.Category ||
+              item.category ||
+              "Uncategorized"
+            )
+
+          )
+        ].sort();
+
+
+      filtersEl.innerHTML =
+        [
+          "All",
+          ...categories
+        ].map(category => `
+
+          <button
+            class="filter ${
+              category === activeCategory
+                ? "active"
+                : ""
+            }"
+            data-category="${category}"
+            type="button"
+          >
+
+            ${category}
+
+          </button>
+
+        `).join("");
+
+
+      filtersEl
+        .querySelectorAll(".filter")
+        .forEach(button => {
+
+          button.addEventListener(
+            "click",
+            () => {
+
+              activeCategory =
+                button.dataset.category;
+
+
+              filtersEl
+                .querySelectorAll(".filter")
+                .forEach(btn =>
+                  btn.classList.toggle(
+                    "active",
+                    btn === button
+                  )
+                );
+
+
+              const filtered =
+                activeCategory === "All"
+
+                  ? allItems
+
+                  : allItems.filter(
+                      item =>
+                        (
+                          item.Category ||
+                          item.category ||
+                          "Uncategorized"
+                        ) === activeCategory
+                    );
+
+
+              render(filtered);
+
+            }
           );
 
-          const filtered = activeCategory === "All"
-            ? allItems
-            : allItems.filter(item =>
-                (item.Category || item.category || "Uncategorized") === activeCategory
-              );
-
-          render(filtered);
         });
-      });
+
     }
+
+
 
     async function loadItems() {
-      const statusEl = document.getElementById("status");
+
+      const statusEl =
+        document.getElementById(
+          "status"
+        );
+
 
       try {
-        const res = await fetch(WORKER_URL);
-        if (!res.ok) throw new Error("Network response was not ok");
 
-        const data = await res.json();
+        const response =
+          await fetch(WORKER_URL);
 
-        allItems = Array.isArray(data)
-          ? data.filter(item => (item.Type || item.type || "") === ITEM_TYPE)
-          : [];
 
-        statusEl.textContent = `${allItems.length} tools`;
+        if (!response.ok) {
+
+          throw new Error(
+            "Network response was not ok"
+          );
+
+        }
+
+
+        const data =
+          await response.json();
+
+
+        allItems =
+          Array.isArray(data)
+
+            ? data.filter(
+                item =>
+                  (
+                    item.Type ||
+                    item.type ||
+                    ""
+                  ) === ITEM_TYPE
+              )
+
+            : [];
+
+
+        statusEl.textContent =
+          `${allItems.length} tools`;
+
 
         renderFilters(allItems);
+
         render(allItems);
-      } catch (err) {
-        console.error(err);
-        statusEl.textContent = "Unable to load this directory right now.";
-        document.getElementById("items").innerHTML =
-          '<div class="empty">Please try again later.</div>';
+
+
       }
+
+      catch (error) {
+
+        console.error(error);
+
+
+        statusEl.textContent =
+          "Unable to load this directory right now.";
+
+
+        document.getElementById(
+          "items"
+        ).innerHTML =
+          '<div class="empty">Please try again later.</div>';
+
+      }
+
     }
 
+
     loadItems();
+
   </script>
+
+
 </body>
+
 </html>
