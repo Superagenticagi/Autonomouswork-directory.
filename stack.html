@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!<!DOCTYPE html>
 
 <html lang="en">
 <head>
@@ -285,170 +285,369 @@
 
   <script>
 
-    const WORKER_URL =
-      "https://raspy-brook-525d.superagentic.workers.dev/";
+  const WORKER_URL =
+    "https://raspy-brook-525d.superagentic.workers.dev/";
 
-    let ecosystem = [];
+  let ecosystem = [];
+  let buildCounter = 0;
+  let isBuilding = false;
 
 
-    async function loadEcosystem() {
+  async function loadEcosystem() {
 
-      const status =
-        document.getElementById("stack-status");
+    const status =
+      document.getElementById("stack-status");
 
-      try {
+    status.textContent =
+      "Ready to build from the current ecosystem.";
 
-        const response =
-          await fetch(WORKER_URL);
+    try {
 
-        if (!response.ok) {
-          throw new Error("Unable to load ecosystem");
-        }
+      const response =
+        await fetch(WORKER_URL);
 
-        ecosystem =
-          await response.json();
-
-        if (!Array.isArray(ecosystem)) {
-          ecosystem = [];
-        }
-
-        status.textContent =
-          `${ecosystem.length} agents and tools available to the builder.`;
-
-        buildStack();
-
-      } catch (error) {
-
-        console.error(error);
-
-        status.textContent =
-          "Unable to load the autonomous ecosystem right now.";
-
+      if (!response.ok) {
+        throw new Error("Unable to load ecosystem");
       }
 
-    }
+      ecosystem = await response.json();
 
+      if (!Array.isArray(ecosystem)) {
+        ecosystem = [];
+      }
 
-    function findItems(type, categories) {
+      status.textContent =
+        `${ecosystem.length} agents and tools available.`;
 
-      return ecosystem
-        .filter(item => {
+    } catch (error) {
 
-          const itemType =
-            item.Type || item.type || "";
+      console.error(error);
 
-          const category =
-            item.Category || item.category || "";
+      ecosystem = [];
 
-          return (
-            itemType === type &&
-            categories.some(
-              c => category.toLowerCase().includes(c)
-            )
-          );
-
-        })
-        .slice(0, 2);
+      status.textContent =
+        "Unable to load the autonomous ecosystem right now.";
 
     }
 
-
-    function buildStack() {
-
-      const output =
-        document.getElementById("generated-stack");
-
-      const layers = [
-
-        {
-          number: "01",
-          icon: "🧠",
-          name: "Intelligence",
-          description: "Reasoning and decision-making",
-          items: findItems("Agent", ["research", "development"])
-        },
-
-        {
-          number: "02",
-          icon: "🤖",
-          name: "Agents",
-          description: "Systems that perform work",
-          items: ecosystem
-            .filter(item =>
-              (item.Type || item.type || "") === "Agent"
-            )
-            .slice(0, 2)
-        },
-
-        {
-          number: "03",
-          icon: "◉",
-          name: "Orchestration",
-          description: "Coordinates autonomous components",
-          items: findItems("Tool", ["orchestration"])
-        },
-
-        {
-          number: "04",
-          icon: "⚡",
-          name: "Automation",
-          description: "Triggers and executes processes",
-          items: findItems("Tool", ["automation"])
-        },
-
-        {
-          number: "05",
-          icon: "🔌",
-          name: "Tools",
-          description: "External capabilities",
-          items: ecosystem
-            .filter(item =>
-              (item.Type || item.type || "") === "Tool"
-            )
-            .slice(0, 2)
-        },
-
-        {
-          number: "06",
-          icon: "◈",
-          name: "Memory",
-          description: "Persistent knowledge and context",
-          items: findItems("Tool", ["memory", "database"])
-        },
-
-        {
-          number: "07",
-          icon: "☁",
-          name: "Infrastructure",
-          description: "Systems supporting the workspace",
-          items: findItems("Tool", ["infrastructure"])
-        }
-
-      ];
+  }
 
 
-      output.innerHTML = layers.map(layer => {
+  function getItems(type, categories = []) {
 
-        const items =
-          layer.items.length
-            ? layer.items.map(item => `
-                <div class="generated-item">
-                  <strong>
-                    ${item.Name || item.name || "Unnamed"}
-                  </strong>
-                  <span>
-                    ${item.Type || item.type || "Component"}
-                  </span>
-                </div>
-              `).join("")
+    return ecosystem.filter(item => {
+
+      const itemType =
+        item.Type || item.type || "";
+
+      const category =
+        (item.Category || item.category || "")
+          .toLowerCase();
+
+      if (itemType !== type) {
+        return false;
+      }
+
+      if (!categories.length) {
+        return true;
+      }
+
+      return categories.some(
+        keyword => category.includes(keyword)
+      );
+
+    });
+
+  }
+
+
+  function choose(items, count = 1) {
+
+    if (!items.length) {
+      return [];
+    }
+
+    /*
+      Rotate the starting point on every build.
+      This means clicking Build My Stack again
+      can produce a different composition.
+    */
+
+    const start =
+      buildCounter % items.length;
+
+    const rotated = [
+      ...items.slice(start),
+      ...items.slice(0, start)
+    ];
+
+    return rotated.slice(0, count);
+
+  }
+
+
+  function uniqueItems(items) {
+
+    const seen = new Set();
+
+    return items.filter(item => {
+
+      const name =
+        (item.Name || item.name || "")
+          .toLowerCase();
+
+      if (!name || seen.has(name)) {
+        return false;
+      }
+
+      seen.add(name);
+
+      return true;
+
+    });
+
+  }
+
+
+  async function buildStack() {
+
+    if (isBuilding) {
+      return;
+    }
+
+    const output =
+      document.getElementById("generated-stack");
+
+    const status =
+      document.getElementById("stack-status");
+
+    if (!ecosystem.length) {
+
+      status.textContent =
+        "No ecosystem data is available yet.";
+
+      return;
+
+    }
+
+
+    isBuilding = true;
+
+    buildCounter++;
+
+
+    status.textContent =
+      "Analyzing available agents and tools...";
+
+
+    output.innerHTML = `
+      <div class="builder-status">
+        Selecting capabilities for your autonomous stack...
+      </div>
+    `;
+
+
+    /*
+      Small delay makes the building process visible
+      instead of appearing instantaneous.
+    */
+
+    await new Promise(
+      resolve => setTimeout(resolve, 650)
+    );
+
+
+    const intelligence =
+      choose(
+        getItems("Agent", [
+          "research",
+          "development",
+          "coding",
+          "data"
+        ]),
+        1
+      );
+
+
+    const agents =
+      choose(
+        getItems("Agent"),
+        2
+      );
+
+
+    const orchestration =
+      choose(
+        getItems("Tool", [
+          "orchestration"
+        ]),
+        1
+      );
+
+
+    const automation =
+      choose(
+        getItems("Tool", [
+          "automation"
+        ]),
+        1
+      );
+
+
+    const tools =
+      choose(
+        getItems("Tool", [
+          "integration",
+          "development",
+          "communication",
+          "productivity"
+        ]),
+        2
+      );
+
+
+    const memory =
+      choose(
+        getItems("Tool", [
+          "memory",
+          "database"
+        ]),
+        1
+      );
+
+
+    const infrastructure =
+      choose(
+        getItems("Tool", [
+          "infrastructure",
+          "monitoring"
+        ]),
+        1
+      );
+
+
+    const layers = [
+
+      {
+        number: "01",
+        icon: "🧠",
+        name: "Intelligence",
+        description:
+          "A capability selected to provide reasoning, research or analysis.",
+        items: intelligence
+      },
+
+      {
+        number: "02",
+        icon: "🤖",
+        name: "Agents",
+        description:
+          "Autonomous workers selected from the current ecosystem.",
+        items: agents
+      },
+
+      {
+        number: "03",
+        icon: "◉",
+        name: "Orchestration",
+        description:
+          "Coordinates agents, tasks and system components.",
+        items: orchestration
+      },
+
+      {
+        number: "04",
+        icon: "⚡",
+        name: "Automation",
+        description:
+          "Triggers and connects autonomous processes.",
+        items: automation
+      },
+
+      {
+        number: "05",
+        icon: "🔌",
+        name: "Tools",
+        description:
+          "External capabilities available to the selected agents.",
+        items: tools
+      },
+
+      {
+        number: "06",
+        icon: "◈",
+        name: "Memory",
+        description:
+          "Provides persistent knowledge or stored information.",
+        items: memory
+      },
+
+      {
+        number: "07",
+        icon: "☁",
+        name: "Infrastructure",
+        description:
+          "Provides the underlying operational foundation.",
+        items: infrastructure
+      }
+
+    ];
+
+
+    output.innerHTML =
+      layers.map(layer => {
+
+        const selected =
+          uniqueItems(layer.items);
+
+
+        const itemHTML =
+          selected.length
+            ? selected.map(item => {
+
+                const name =
+                  item.Name ||
+                  item.name ||
+                  "Unnamed";
+
+                const type =
+                  item.Type ||
+                  item.type ||
+                  "Component";
+
+                const category =
+                  item.Category ||
+                  item.category ||
+                  "";
+
+                return `
+                  <div class="generated-item">
+
+                    <div>
+                      <strong>
+                        ${name}
+                      </strong>
+
+                      <div class="generated-item-category">
+                        ${type}${category ? " · " + category : ""}
+                      </div>
+                    </div>
+
+                    <span>Selected</span>
+
+                  </div>
+                `;
+
+              }).join("")
             : `
                 <div class="generated-empty">
-                  No matching component discovered yet.
+                  No matching capability discovered yet.
                 </div>
               `;
 
 
         return `
+
           <div class="generated-layer">
 
             <div class="generated-layer-head">
@@ -462,32 +661,53 @@
               </div>
 
               <div>
-                <h3>${layer.name}</h3>
-                <p>${layer.description}</p>
+
+                <h3>
+                  ${layer.name}
+                </h3>
+
+                <p>
+                  ${layer.description}
+                </p>
+
               </div>
 
             </div>
 
+
             <div class="generated-items">
-              ${items}
+
+              ${itemHTML}
+
             </div>
 
           </div>
+
         `;
 
       }).join("");
 
-    }
+
+    status.textContent =
+      `Stack built from ${ecosystem.length} discovered capabilities.`;
 
 
-    document
-      .getElementById("build-stack")
-      .addEventListener("click", buildStack);
+    isBuilding = false;
+
+  }
 
 
-    loadEcosystem();
+  document
+    .getElementById("build-stack")
+    .addEventListener(
+      "click",
+      buildStack
+    );
 
-  </script>
+
+  loadEcosystem();
+
+</script>
 
 </body>
-</html>
+    </html>
