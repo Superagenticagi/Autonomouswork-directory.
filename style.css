@@ -2191,3 +2191,30 @@ gap: 8px;
 }
 
 }
+.generated-item-category {
+color: var(--muted);
+font-size: 0.72rem;
+margin-top: 3px;
+}
+
+.workflow-build-summary {
+margin-top: 25px;
+padding: 22px 24px;
+border: 1px solid rgba(70, 179, 255, 0.16);
+border-radius: 14px;
+background: rgba(70, 179, 255, 0.035);
+}
+
+.workflow-build-summary > span {
+color: var(--blue);
+font-size: 0.7rem;
+font-weight: 700;
+letter-spacing: 0.12em;
+}
+
+.workflow-build-summary p {
+color: var(--muted);
+margin-top: 8px;
+font-size: 0.88rem;
+}
+
