@@ -1,125 +1,452 @@
+
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
+
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Autonomous AI Agents | Autonomous Work</title>
-  <link rel="stylesheet" href="style.css" />
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  />
+
+  <meta
+    name="description"
+    content="Discover AI agents for research, coding, data, marketing, sales, operations and autonomous work."
+  />
+
+  <title>AI Agents | Autonomous Work Space</title>
+
+  <link
+    rel="stylesheet"
+    href="style.css"
+  />
+
 </head>
+
+
 <body>
-  <!-- Futuristic Navbar -->
-  <div class="navbar">
+
+  <!-- Background Effects -->
+
+  <div class="background-glow glow-one"></div>
+  <div class="background-glow glow-two"></div>
+
+
+  <!-- Navigation -->
+
+  <nav class="navbar">
+
     <div class="nav-container">
-      <div class="brand">
-        <span class="brand-icon">⚡</span>
-        <strong>Autonomous Work Space</strong>
-      </div>
+
+      <a
+        href="index.html"
+        class="brand"
+      >
+
+        <span class="brand-icon">
+          ◉
+        </span>
+
+        <span>
+          Autonomous
+          <strong>Work Space</strong>
+        </span>
+
+      </a>
+
+
       <div class="nav-links">
-        <a href="index.html">Home</a>
-        <a href="agents.html" class="active">Agents</a>
-        <a href="tools.html">Tools</a>
-        <a href="stack.html">Stack</a>
-        <a href="workflows.html">Workflows</a>
+
+        <a href="index.html">
+          Home
+        </a>
+
+        <a
+          href="agents.html"
+          class="active"
+        >
+          Agents
+        </a>
+
+        <a href="tools.html">
+          Tools
+        </a>
+
+        <a href="stack.html">
+          Stack
+        </a>
+
+        <a href="workflows.html">
+          Workflows
+        </a>
+
       </div>
-    </div>
-  </div>
 
-  <!-- Page Content Block -->
-  <div class="discoveries-section">
-    <div class="section-header">
-      <h2><span>Autonomous</span> Agents</h2>
-      <p>Agents built to perform tasks and workflows with greater autonomy.</p>
     </div>
 
-    <div id="status" class="directory-status">Loading agents...</div>
-    <div class="filters" id="filters"></div>
-    <div class="discoveries-grid" id="items"></div>
-  </div>
+  </nav>
+
+
+
+  <main>
+
+    <section class="section discoveries-section">
+
+
+      <div class="section-header">
+
+        <div>
+
+          <div class="section-label">
+
+            AUTONOMOUS WORK
+
+          </div>
+
+
+          <h1>
+
+            <span>AI</span> Agents
+
+          </h1>
+
+        </div>
+
+
+        <p>
+
+          Discover agents designed to research,
+          analyze, code, communicate and perform
+          different types of work.
+
+        </p>
+
+      </div>
+
+
+
+      <div
+        id="status"
+        class="directory-status"
+      >
+
+        Loading agents...
+
+      </div>
+
+
+      <div
+        class="filters"
+        id="filters"
+      ></div>
+
+
+      <div
+        class="discoveries-grid"
+        id="items"
+      ></div>
+
+
+    </section>
+
+  </main>
+
+
+
+  <!-- Footer -->
+
+  <footer>
+
+    <div class="footer-brand">
+
+      <span class="brand-icon">
+        ◉
+      </span>
+
+      Autonomous Work Space
+
+    </div>
+
+
+    <p>
+
+      AI agents for autonomous work.
+
+    </p>
+
+  </footer>
+
+
 
   <script>
-    const WORKER_URL = "https://raspy-brook-525d.superagentic.workers.dev/";
-    const ITEM_TYPE = "Agent";
+
+    const WORKER_URL =
+      "https://raspy-brook-525d.superagentic.workers.dev/";
+
+
+    const ITEM_TYPE =
+      "Agent";
+
+
     let allItems = [];
-    let activeCategory = "All";
+
+    let activeCategory =
+      "All";
+
+
 
     function render(items) {
-      const itemsEl = document.getElementById("items");
+
+      const itemsEl =
+        document.getElementById(
+          "items"
+        );
+
 
       if (!items.length) {
-        itemsEl.innerHTML = '<div class="empty">No autonomous agents found.</div>';
+
+        itemsEl.innerHTML =
+          '<div class="empty">No autonomous agents found.</div>';
+
         return;
+
       }
 
-      itemsEl.innerHTML = items.map(item => `
-        <div class="discovery-card">
-          <div class="discovery-top">
-            <span class="discovery-category">${item.Category || item.category || "Uncategorized"}</span>
-            <span class="discovery-arrow">→</span>
-          </div>
-          <h3>${item.Name || item.name || "Untitled"}</h3>
-          <p>${item.Description || item.description || ""}</p>
-          <a href="${item.URL || item.url || '#'}" target="_blank" rel="noopener noreferrer">Visit</a>
-        </div>
-      `).join("");
+
+      itemsEl.innerHTML =
+        items.map(item => `
+
+          <article class="discovery-card">
+
+            <div class="discovery-top">
+
+              <span class="discovery-category">
+
+                ${item.Category ||
+                  item.category ||
+                  "Uncategorized"}
+
+              </span>
+
+              <span class="discovery-arrow">
+                ↗
+              </span>
+
+            </div>
+
+
+            <h3>
+
+              ${item.Name ||
+                item.name ||
+                "Untitled"}
+
+            </h3>
+
+
+            <p>
+
+              ${item.Description ||
+                item.description ||
+                ""}
+
+            </p>
+
+
+            <a
+              href="${item.URL ||
+                item.url ||
+                "#"}"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+
+              Visit
+              →
+
+            </a>
+
+          </article>
+
+        `).join("");
+
     }
+
+
 
     function renderFilters(items) {
-      const filtersEl = document.getElementById("filters");
-      const categories = [...new Set(
-        items.map(item => item.Category || item.category || "Uncategorized")
-      )].sort();
 
-      filtersEl.innerHTML = ["All", ...categories].map(category => `
-        <button class="filter ${category === activeCategory ? "active" : ""}" data-category="${category}">
-          ${category}
-        </button>
-      `).join("");
+      const filtersEl =
+        document.getElementById(
+          "filters"
+        );
 
-      filtersEl.querySelectorAll(".filter").forEach(button => {
-        button.addEventListener("click", () => {
-          activeCategory = button.dataset.category;
 
-          filtersEl.querySelectorAll(".filter").forEach(btn =>
-            btn.classList.toggle("active", btn === button)
+      const categories =
+        [
+          ...new Set(
+
+            items.map(item =>
+              item.Category ||
+              item.category ||
+              "Uncategorized"
+            )
+
+          )
+        ].sort();
+
+
+      filtersEl.innerHTML =
+        [
+          "All",
+          ...categories
+        ].map(category => `
+
+          <button
+            class="filter ${
+              category === activeCategory
+                ? "active"
+                : ""
+            }"
+            data-category="${category}"
+            type="button"
+          >
+
+            ${category}
+
+          </button>
+
+        `).join("");
+
+
+      filtersEl
+        .querySelectorAll(".filter")
+        .forEach(button => {
+
+          button.addEventListener(
+            "click",
+            () => {
+
+              activeCategory =
+                button.dataset.category;
+
+
+              filtersEl
+                .querySelectorAll(".filter")
+                .forEach(btn =>
+                  btn.classList.toggle(
+                    "active",
+                    btn === button
+                  )
+                );
+
+
+              const filtered =
+                activeCategory === "All"
+
+                  ? allItems
+
+                  : allItems.filter(
+                      item =>
+                        (
+                          item.Category ||
+                          item.category ||
+                          "Uncategorized"
+                        ) === activeCategory
+                    );
+
+
+              render(filtered);
+
+            }
           );
 
-          const filtered = activeCategory === "All"
-            ? allItems
-            : allItems.filter(item =>
-                (item.Category || item.category || "Uncategorized") === activeCategory
-              );
-
-          render(filtered);
         });
-      });
+
     }
+
+
 
     async function loadItems() {
-      const statusEl = document.getElementById("status");
+
+      const statusEl =
+        document.getElementById(
+          "status"
+        );
+
 
       try {
-        const res = await fetch(WORKER_URL);
-        if (!res.ok) throw new Error("Network response was not ok");
 
-        const data = await res.json();
+        const response =
+          await fetch(WORKER_URL);
 
-        allItems = Array.isArray(data)
-          ? data.filter(item => (item.Type || item.type || "") === ITEM_TYPE)
-          : [];
 
-        statusEl.textContent = `${allItems.length} agents`;
+        if (!response.ok) {
+
+          throw new Error(
+            "Network response was not ok"
+          );
+
+        }
+
+
+        const data =
+          await response.json();
+
+
+        allItems =
+          Array.isArray(data)
+
+            ? data.filter(
+                item =>
+                  (
+                    item.Type ||
+                    item.type ||
+                    ""
+                  ) === ITEM_TYPE
+              )
+
+            : [];
+
+
+        statusEl.textContent =
+          `${allItems.length} agents`;
+
 
         renderFilters(allItems);
+
         render(allItems);
-      } catch (err) {
-        console.error(err);
-        statusEl.textContent = "Unable to load this directory right now.";
-        document.getElementById("items").innerHTML =
-          '<div class="empty">Please try again later.</div>';
+
+
       }
+
+      catch (error) {
+
+        console.error(error);
+
+
+        statusEl.textContent =
+          "Unable to load this directory right now.";
+
+
+        document.getElementById(
+          "items"
+        ).innerHTML =
+          '<div class="empty">Please try again later.</div>';
+
+      }
+
     }
 
+
     loadItems();
+
   </script>
+
+
 </body>
+
 </html>
+
