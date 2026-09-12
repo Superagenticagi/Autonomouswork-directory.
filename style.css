@@ -1778,13 +1778,13 @@ footer {
   }
 
   }
-```css
+
 /* =========================================
    ADDITIONAL NAV / PAGE ELEMENTS
 ========================================= */
 
 .section-action {
-  margin-top: 50px;
+  margin-top: 65px;
   text-align: center;
 }
 
@@ -1845,6 +1845,33 @@ footer {
   color: var(--blue);
 }
 
+
+/* =========================================
+   EXPLORE CARD SPACING
+========================================= */
+
+.explore-card p {
+  margin-bottom: 35px;
+}
+
+.explore-card .card-footer {
+  bottom: 28px;
+}
+
+
+/* =========================================
+   STACK BUTTON SPACING
+========================================= */
+
+.section-action {
+  margin-top: 70px;
+}
+
+
+/* =========================================
+   MOBILE
+========================================= */
+
 @media (max-width: 700px) {
 
   .latest-links {
@@ -1852,9 +1879,9 @@ footer {
   }
 
   .section-action {
+    margin-top: 55px;
     text-align: left;
   }
 
 }
-```
 
