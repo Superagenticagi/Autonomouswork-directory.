@@ -1778,3 +1778,83 @@ footer {
   }
 
   }
+```css
+/* =========================================
+   ADDITIONAL NAV / PAGE ELEMENTS
+========================================= */
+
+.section-action {
+  margin-top: 50px;
+  text-align: center;
+}
+
+.latest-links {
+  display: flex;
+  gap: 22px;
+  align-items: center;
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 35px;
+}
+
+.filter {
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--muted);
+  padding: 8px 15px;
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: 0.25s;
+}
+
+.filter:hover {
+  color: var(--text);
+  border-color: rgba(70, 179, 255, 0.35);
+  background: rgba(70, 179, 255, 0.06);
+}
+
+.filter.active {
+  color: white;
+  border-color: rgba(70, 179, 255, 0.45);
+  background: rgba(70, 179, 255, 0.12);
+}
+
+.empty {
+  grid-column: 1 / -1;
+  padding: 50px 20px;
+  text-align: center;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: rgba(16, 24, 39, 0.5);
+}
+
+.discoveries-section > .section-header h1 {
+  font-size: clamp(2.5rem, 5vw, 4.5rem);
+  line-height: 1.05;
+  letter-spacing: -0.04em;
+}
+
+.discoveries-section > .section-header h1 span {
+  color: var(--blue);
+}
+
+@media (max-width: 700px) {
+
+  .latest-links {
+    gap: 16px;
+  }
+
+  .section-action {
+    text-align: left;
+  }
+
+}
+```
+
