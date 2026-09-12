@@ -328,339 +328,523 @@
 
   <script>
 
-    const WORKER_URL =
-      "https://raspy-brook-525d.superagentic.workers.dev/";
+  const WORKER_URL =
+    "https://raspy-brook-525d.superagentic.workers.dev/";
 
-    let ecosystem = [];
-    let activeGoal = "Research";
+  let ecosystem = [];
+  let activeGoal = "Research";
+  let buildCounter = 0;
+  let isBuilding = false;
 
 
-    async function loadEcosystem() {
+  async function loadEcosystem() {
 
-      const status =
-        document.getElementById("workflow-status");
+    const status =
+      document.getElementById("workflow-status");
 
-      try {
+    status.textContent =
+      "Ready to build from the current ecosystem.";
 
-        const response =
-          await fetch(WORKER_URL);
+    try {
 
-        if (!response.ok) {
-          throw new Error("Unable to load ecosystem");
-        }
+      const response =
+        await fetch(WORKER_URL);
 
-        ecosystem =
-          await response.json();
-
-        if (!Array.isArray(ecosystem)) {
-          ecosystem = [];
-        }
-
-        status.textContent =
-          `${ecosystem.length} capabilities available.`;
-
-        buildWorkflow();
-
-      } catch (error) {
-
-        console.error(error);
-
-        status.textContent =
-          "Unable to load autonomous capabilities right now.";
-
+      if (!response.ok) {
+        throw new Error("Unable to load ecosystem");
       }
 
-    }
+      ecosystem =
+        await response.json();
 
+      if (!Array.isArray(ecosystem)) {
+        ecosystem = [];
+      }
 
-    function getAgents(goal) {
+      status.textContent =
+        `${ecosystem.length} capabilities available.`;
 
-      const exact =
-        ecosystem.filter(item =>
-          (item.Type || item.type || "") === "Agent" &&
-          (item.Category || item.category || "")
-            .toLowerCase()
-            .includes(goal.toLowerCase())
-        );
+    } catch (error) {
 
-      const all =
-        ecosystem.filter(item =>
-          (item.Type || item.type || "") === "Agent"
-        );
+      console.error(error);
 
-      return [
-        ...exact,
-        ...all
-      ].filter(
-        (item, index, arr) =>
-          arr.findIndex(
-            x => (x.Name || x.name) === (item.Name || item.name)
-          ) === index
-      ).slice(0, 3);
+      ecosystem = [];
+
+      status.textContent =
+        "Unable to load autonomous capabilities right now.";
 
     }
 
+  }
 
-    function getTools(goal) {
 
-      const preferredCategories = {
+  function getItems(type, categories = []) {
 
-        Research: [
+    return ecosystem.filter(item => {
+
+      const itemType =
+        item.Type || item.type || "";
+
+      const category =
+        (item.Category || item.category || "")
+          .toLowerCase();
+
+      if (itemType !== type) {
+        return false;
+      }
+
+      if (!categories.length) {
+        return true;
+      }
+
+      return categories.some(
+        keyword => category.includes(keyword)
+      );
+
+    });
+
+  }
+
+
+  function choose(items, count = 1) {
+
+    if (!items.length) {
+      return [];
+    }
+
+    const start =
+      buildCounter % items.length;
+
+    const rotated = [
+      ...items.slice(start),
+      ...items.slice(0, start)
+    ];
+
+    return rotated.slice(0, count);
+
+  }
+
+
+  function uniqueItems(items) {
+
+    const seen = new Set();
+
+    return items.filter(item => {
+
+      const name =
+        (item.Name || item.name || "")
+          .toLowerCase();
+
+      if (!name || seen.has(name)) {
+        return false;
+      }
+
+      seen.add(name);
+
+      return true;
+
+    });
+
+  }
+
+
+  function getGoalCategories(goal) {
+
+    const mapping = {
+
+      Research: {
+        agents: [
           "research",
-          "database",
-          "integration"
+          "data",
+          "browser"
         ],
+        tools: [
+          "database",
+          "integration",
+          "memory",
+          "productivity"
+        ]
+      },
 
-        Coding: [
+      Coding: {
+        agents: [
+          "coding",
+          "development"
+        ],
+        tools: [
           "development",
           "integration",
           "infrastructure"
-        ],
+        ]
+      },
 
-        Marketing: [
+      Marketing: {
+        agents: [
+          "marketing",
+          "research",
+          "data"
+        ],
+        tools: [
           "automation",
           "communication",
           "integration"
-        ],
+        ]
+      },
 
-        Sales: [
-          "automation",
+      Sales: {
+        agents: [
+          "sales",
+          "research",
+          "customer support"
+        ],
+        tools: [
           "communication",
+          "automation",
           "integration"
-        ],
+        ]
+      },
 
-        Operations: [
+      Operations: {
+        agents: [
+          "operations",
+          "productivity",
+          "data"
+        ],
+        tools: [
           "automation",
           "orchestration",
           "monitoring"
         ]
+      }
 
-      };
+    };
 
+    return mapping[goal] || mapping.Research;
 
-      const categories =
-        preferredCategories[goal] || [];
-
-
-      const preferred =
-        ecosystem.filter(item => {
-
-          const type =
-            item.Type || item.type || "";
-
-          const category =
-            (item.Category || item.category || "")
-              .toLowerCase();
-
-          return (
-            type === "Tool" &&
-            categories.some(c =>
-              category.includes(c)
-            )
-          );
-
-        });
+  }
 
 
-      const allTools =
-        ecosystem.filter(item =>
-          (item.Type || item.type || "") === "Tool"
-        );
+  async function buildWorkflow() {
 
+    if (isBuilding) {
+      return;
+    }
 
-      return [
-        ...preferred,
-        ...allTools
-      ].filter(
-        (item, index, arr) =>
-          arr.findIndex(
-            x => (x.Name || x.name) === (item.Name || item.name)
-          ) === index
-      ).slice(0, 3);
+    if (!ecosystem.length) {
+
+      document
+        .getElementById("workflow-status")
+        .textContent =
+          "No ecosystem data is available yet.";
+
+      return;
 
     }
 
 
-    function buildWorkflow() {
-
-      const output =
-        document.getElementById("generated-workflow");
-
-      const agents =
-        getAgents(activeGoal);
-
-      const tools =
-        getTools(activeGoal);
+    isBuilding = true;
+    buildCounter++;
 
 
-      const stages = [
+    const output =
+      document.getElementById("generated-workflow");
 
-        {
-          number: "01",
-          icon: "🎯",
-          name: "Define the Goal",
-          description:
-            `Start the ${activeGoal.toLowerCase()} objective.`
-        },
-
-        {
-          number: "02",
-          icon: "🔎",
-          name: "Research & Analyze",
-          description:
-            "Gather information and determine what needs to happen."
-        },
-
-        {
-          number: "03",
-          icon: "🤖",
-          name: "Agent Work",
-          description:
-            "Use the most relevant autonomous agents."
-        },
-
-        {
-          number: "04",
-          icon: "⚡",
-          name: "Use Tools",
-          description:
-            "Give agents access to the capabilities required."
-        },
-
-        {
-          number: "05",
-          icon: "🔄",
-          name: "Evaluate",
-          description:
-            "Check the result and determine the next action."
-        },
-
-        {
-          number: "06",
-          icon: "✓",
-          name: "Deliver Result",
-          description:
-            "Return the completed outcome."
-        }
-
-      ];
+    const status =
+      document.getElementById("workflow-status");
 
 
-      output.innerHTML = `
-
-        <div class="workflow-goal">
-
-          <span>GOAL</span>
-
-          <strong>
-            Autonomous ${activeGoal} Workflow
-          </strong>
-
-        </div>
+    status.textContent =
+      `Planning an autonomous ${activeGoal.toLowerCase()} workflow...`;
 
 
-        <div class="workflow-stages">
+    output.innerHTML = `
+      <div class="builder-status">
+        Analyzing agents, tools and capabilities...
+      </div>
+    `;
 
-          ${stages.map(stage => `
 
-            <div class="workflow-stage">
+    await new Promise(
+      resolve => setTimeout(resolve, 650)
+    );
 
-              <div class="workflow-stage-number">
-                ${stage.number}
-              </div>
 
-              <div class="workflow-stage-icon">
-                ${stage.icon}
-              </div>
+    const categories =
+      getGoalCategories(activeGoal);
 
-              <div class="workflow-stage-content">
 
-                <h3>
-                  ${stage.name}
-                </h3>
+    const agents =
+      uniqueItems(
+        choose(
+          getItems(
+            "Agent",
+            categories.agents
+          ),
+          3
+        )
+      );
 
-                <p>
-                  ${stage.description}
-                </p>
 
-              </div>
+    const tools =
+      uniqueItems(
+        choose(
+          getItems(
+            "Tool",
+            categories.tools
+          ),
+          3
+        )
+      );
+
+
+    /*
+      If there are not enough goal-specific
+      components, supplement them with the
+      general ecosystem.
+    */
+
+    if (agents.length < 2) {
+
+      agents.push(
+        ...uniqueItems(
+          choose(
+            getItems("Agent"),
+            3
+          )
+        ).filter(item =>
+          !agents.some(
+            existing =>
+              (existing.Name || existing.name) ===
+              (item.Name || item.name)
+          )
+        )
+      );
+
+    }
+
+
+    if (tools.length < 2) {
+
+      tools.push(
+        ...uniqueItems(
+          choose(
+            getItems("Tool"),
+            3
+          )
+        ).filter(item =>
+          !tools.some(
+            existing =>
+              (existing.Name || existing.name) ===
+              (item.Name || item.name)
+          )
+        )
+      );
+
+    }
+
+
+    const stages = [
+
+      {
+        number: "01",
+        icon: "🎯",
+        name: "Define the Goal",
+        description:
+          `Set the objective for the ${activeGoal.toLowerCase()} system.`
+      },
+
+      {
+        number: "02",
+        icon: "🔎",
+        name: "Research & Analyze",
+        description:
+          "Gather the information required to understand the task."
+      },
+
+      {
+        number: "03",
+        icon: "🤖",
+        name: "Agent Work",
+        description:
+          "Assign the most relevant autonomous agents."
+      },
+
+      {
+        number: "04",
+        icon: "⚡",
+        name: "Use Tools",
+        description:
+          "Provide agents with the capabilities needed to act."
+      },
+
+      {
+        number: "05",
+        icon: "🔄",
+        name: "Evaluate",
+        description:
+          "Check the result and determine whether another action is required."
+      },
+
+      {
+        number: "06",
+        icon: "✓",
+        name: "Deliver Result",
+        description:
+          "Produce the final outcome for the original goal."
+      }
+
+    ];
+
+
+    output.innerHTML = `
+
+      <div class="workflow-goal">
+
+        <span>GOAL</span>
+
+        <strong>
+          Autonomous ${activeGoal} Workflow
+        </strong>
+
+      </div>
+
+
+      <div class="workflow-stages">
+
+        ${stages.map(stage => `
+
+          <div class="workflow-stage">
+
+            <div class="workflow-stage-number">
+              ${stage.number}
+            </div>
+
+            <div class="workflow-stage-icon">
+              ${stage.icon}
+            </div>
+
+            <div class="workflow-stage-content">
+
+              <h3>
+                ${stage.name}
+              </h3>
+
+              <p>
+                ${stage.description}
+              </p>
 
             </div>
 
-          `).join("")}
+          </div>
 
-        </div>
+        `).join("")}
+
+      </div>
 
 
-        <div class="workflow-components">
+      <div class="workflow-components">
 
-          <div class="component-panel">
+        <div class="component-panel">
 
-            <div class="section-label">
-              SELECTED AGENTS
-            </div>
+          <div class="section-label">
+            SELECTED AGENTS
+          </div>
 
-            ${
-              agents.length
-              ? agents.map(item => `
+          ${
+            agents.length
+              ? agents.slice(0, 3).map(item => `
+
                   <div class="component-item">
+
                     <strong>
                       ${item.Name || item.name || "Unnamed"}
                     </strong>
+
                     <span>
                       ${item.Category || item.category || "Agent"}
                     </span>
+
                   </div>
+
                 `).join("")
               : `
                   <div class="generated-empty">
                     No matching agents discovered yet.
                   </div>
                 `
-            }
+          }
 
+        </div>
+
+
+        <div class="component-panel">
+
+          <div class="section-label">
+            SELECTED TOOLS
           </div>
 
+          ${
+            tools.length
+              ? tools.slice(0, 3).map(item => `
 
-          <div class="component-panel">
-
-            <div class="section-label">
-              SELECTED TOOLS
-            </div>
-
-            ${
-              tools.length
-              ? tools.map(item => `
                   <div class="component-item">
+
                     <strong>
                       ${item.Name || item.name || "Unnamed"}
                     </strong>
+
                     <span>
                       ${item.Category || item.category || "Tool"}
                     </span>
+
                   </div>
+
                 `).join("")
               : `
                   <div class="generated-empty">
                     No matching tools discovered yet.
                   </div>
                 `
-            }
-
-          </div>
+          }
 
         </div>
 
-      `;
-
-    }
+      </div>
 
 
-    document
-      .querySelectorAll(".goal-button")
-      .forEach(button => {
+      <div class="workflow-build-summary">
 
-        button.addEventListener("click", () => {
+        <span>
+          AUTONOMOUS PLAN
+        </span>
+
+        <p>
+          This workflow was assembled from the
+          ${ecosystem.length} agents and tools currently
+          available in the Autonomous Work Space ecosystem.
+        </p>
+
+      </div>
+
+    `;
+
+
+    status.textContent =
+      `Workflow built using ${activeGoal.toLowerCase()} capabilities.`;
+
+
+    isBuilding = false;
+
+  }
+
+
+  document
+    .querySelectorAll(".goal-button")
+    .forEach(button => {
+
+      button.addEventListener(
+        "click",
+        () => {
 
           document
             .querySelectorAll(".goal-button")
@@ -673,21 +857,30 @@
           activeGoal =
             button.dataset.goal;
 
+          /*
+            Changing the goal rebuilds the
+            workflow automatically.
+          */
+
           buildWorkflow();
 
-        });
+        }
+      );
 
-      });
-
-
-    document
-      .getElementById("build-workflow")
-      .addEventListener("click", buildWorkflow);
+    });
 
 
-    loadEcosystem();
+  document
+    .getElementById("build-workflow")
+    .addEventListener(
+      "click",
+      buildWorkflow
+    );
 
-  </script>
 
+  loadEcosystem();
+
+</script>
+    
 </body>
 </html>
