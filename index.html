@@ -1,3 +1,4 @@
+```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -10,10 +11,10 @@
 
   <meta
     name="description"
-    content="Discover AI agents, tools, automation and infrastructure for building autonomous workspaces."
+    content="Autonomous Work Space helps you discover AI agents, tools, infrastructure and workflows for building autonomous work systems."
   >
 
-  <title>Autonomous Work Space | The Future of Autonomous Work</title>
+  <title>Autonomous Work Space | Build Autonomous Work</title>
 
   <link rel="stylesheet" href="style.css">
 </head>
@@ -57,11 +58,11 @@
           Tools
         </a>
 
-        <a href="#stack">
+        <a href="stack.html">
           Stack
         </a>
 
-        <a href="#workflows">
+        <a href="workflows.html">
           Workflows
         </a>
 
@@ -86,17 +87,17 @@
 
           <span class="pulse"></span>
 
-          Exploring the future of autonomous work
+          Building the future of autonomous work
 
         </div>
 
 
         <h1>
 
-          The Future of Work
+          Build Your
 
           <span>
-            Is Becoming Autonomous.
+            Autonomous Workspace.
           </span>
 
         </h1>
@@ -104,9 +105,9 @@
 
         <p class="hero-description">
 
-          Discover AI agents, intelligent tools, automation
-          and infrastructure for building the next generation
-          of autonomous workspaces.
+          Discover the AI agents, tools, infrastructure and
+          workflows needed to build systems that can perform
+          meaningful work with increasing autonomy.
 
         </p>
 
@@ -215,15 +216,14 @@
 
           <p>
 
-            Instead of using AI as a single assistant,
-            autonomous workspaces connect multiple systems
-            that can research, analyze, communicate,
-            execute tasks and work together.
+            Instead of relying on one AI assistant, an
+            autonomous workspace connects multiple systems
+            that can research, analyze, communicate, execute
+            tasks and work together.
 
           </p>
 
         </div>
-
 
       </div>
 
@@ -249,7 +249,7 @@
 
             Explore the
 
-            <span>Ecosystem</span>
+            <span>Building Blocks</span>
 
           </h2>
 
@@ -258,9 +258,8 @@
 
         <p>
 
-          Discover the technologies that can help
-          transform traditional work into autonomous
-          systems.
+          Start with the agents and tools that form the
+          foundation of autonomous work systems.
 
         </p>
 
@@ -307,7 +306,7 @@
 
           <div class="card-footer">
 
-            Explore Agents
+            Explore Agents →
 
           </div>
 
@@ -342,8 +341,8 @@
 
           <p>
 
-            Explore the platforms, tools and
-            systems that give autonomous
+            Explore the platforms, systems and
+            infrastructure that give autonomous
             workspaces real capabilities.
 
           </p>
@@ -351,7 +350,7 @@
 
           <div class="card-footer">
 
-            Explore Tools
+            Explore Tools →
 
           </div>
 
@@ -594,6 +593,21 @@
 
       </div>
 
+
+      <div class="section-action">
+
+        <a
+          href="stack.html"
+          class="button button-secondary"
+        >
+
+          Explore the Autonomous Stack
+          <span>→</span>
+
+        </a>
+
+      </div>
+
     </section>
 
 
@@ -623,14 +637,23 @@
         </div>
 
 
-        <a
-          href="agents.html"
-          class="text-link"
-        >
+        <div class="latest-links">
 
-          View Directory →
+          <a
+            href="agents.html"
+            class="text-link"
+          >
+            Agents →
+          </a>
 
-        </a>
+          <a
+            href="tools.html"
+            class="text-link"
+          >
+            Tools →
+          </a>
+
+        </div>
 
       </div>
 
@@ -670,25 +693,25 @@
 
           <div class="section-label">
 
-            05 — BUILD WHAT'S NEXT
+            05 — AUTONOMOUS WORKFLOWS
 
           </div>
 
 
           <h2>
 
-            Build Your
+            Connect the Pieces
 
-            <span>Autonomous Workspace.</span>
+            <span>Into Workflows.</span>
 
           </h2>
 
 
           <p>
 
-            Explore agents, tools and systems
-            required to create workspaces that
-            can increasingly operate on their own.
+            Agents and tools become more powerful when
+            connected into systems designed around a
+            specific goal or type of work.
 
           </p>
 
@@ -717,16 +740,15 @@
 
 
           <a
-            href="agents.html"
+            href="workflows.html"
             class="button button-primary"
           >
 
-            Start Exploring
+            Explore Workflows
 
             <span>→</span>
 
           </a>
-
 
         </div>
 
@@ -834,6 +856,12 @@
               "Untitled";
 
 
+            const type =
+              item.Type ||
+              item.type ||
+              "Discovery";
+
+
             const category =
               item.Category ||
               item.category ||
@@ -860,7 +888,7 @@
 
                   <span class="discovery-category">
 
-                    ${category}
+                    ${type} · ${category}
 
                   </span>
 
@@ -926,4 +954,5 @@
 
 
 </body>
-  </html>
+</html>
+```
