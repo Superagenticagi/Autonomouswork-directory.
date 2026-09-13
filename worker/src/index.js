@@ -1,3 +1,5 @@
+Latest cloudflare rasp worker code
+
 export default {
   async fetch(request, env) {
     const corsHeaders = {
@@ -411,3 +413,4 @@ Do not include commentary outside the JSON.
       );
     }
   },
+};
