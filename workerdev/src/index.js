@@ -79,26 +79,9 @@ export default {
 
       /*
        * ============================================================
-       * POST /build-stack
+       * POST — BUILD STACK
        * ============================================================
        */
-      const url = new URL(request.url);
-
-      if (url.pathname !== "/build-stack") {
-        return new Response(
-          JSON.stringify({
-            error: "Unknown endpoint",
-          }),
-          {
-            status: 404,
-            headers: {
-              ...corsHeaders,
-              "Content-Type": "application/json",
-            },
-          }
-        );
-      }
-
       if (!env.OPENROUTER_KEY) {
         return new Response(
           JSON.stringify({
@@ -317,14 +300,14 @@ Return JSON using exactly this structure:
       }
 
       /*
+       * ============================================================
+       * BUILD MODEL CANDIDATE LIST
+       * ============================================================
+       */
+      const discoveredFreeModels = await getFreeModels();
+      const modelCandidates = ["openrouter/free", ...discoveredFreeModels];
+      const uniqueModels = [...new Set(modelCandidates)];
 
-* ============================================================
-* BUILD MODEL CANDIDATE LIST
-* ============================================================
-*/
-const discoveredFreeModels = await getFreeModels();
-const modelCandidates = ["openrouter/free", ...discoveredFreeModels];
-const uniqueModels = [...new Set(modelCandidates)];
 const MAX_MODEL_ATTEMPTS = Math.min(uniqueModels.length, 8);
 /*
 * ============================================================
@@ -363,12 +346,10 @@ if (Array.isArray(content)) {
 content = content.map((part) => (typeof part === "string" ? part : part?.text || "")).join("");
 }
 content = String(content || "").trim();
-// Strip unexpected markdown code block tags if the model returned them
 content = content.replace(/^json\s*/i, "").replace(/\s*$/, "").trim();
 try {
 return JSON.parse(content);
 } catch {
-// Fallback parser attempt if trailing fragments exist
 const start = content.indexOf("{");
 const end = content.lastIndexOf("}");
 if (start !== -1 && end !== -1 && end > start) {
@@ -392,19 +373,16 @@ let attempts = 0;
 const failures = [];
 for (const model of uniqueModels.slice(0, MAX_MODEL_ATTEMPTS)) {
 attempts++;
-// Pass 1: Build initial architecture blueprint
 const draftStack = await callModel(model, synthesisSystemPrompt, synthesisUserPrompt);
 if (!draftStack || !draftStack.layers) {
 failures.push({ model, stage: "Synthesis Failed or Malformed JSON" });
 continue;
 }
-// Pass 2: Autonomously simulate data pipelines and evaluate structural friction
 const simulationResult = await callModel(model, simulationSystemPrompt, buildSimulationUserPrompt(draftStack));
 if (!simulationResult || !simulationResult.review) {
 failures.push({ model, stage: "Simulation Failed or Malformed JSON" });
 continue;
 }
-// Pass 3: Assemble everything clean back into the front-end layout contract
 finalArchitecture = {
 goal_summary: draftStack.goal_summary || "Pipeline generation finished.",
 core_capabilities: draftStack.core_capabilities || [],
@@ -415,7 +393,7 @@ review: simulationResult.review || { summary: "", improvements: [] },
 architecture_summary: simulationResult.data_flow_trace || ""
 };
 successfulModel = model;
-break; // Stop running down the candidate chain because an architecture passed checking completely
+break;
 }
 /*
 * ============================================================
