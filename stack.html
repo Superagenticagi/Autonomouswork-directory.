@@ -341,16 +341,16 @@
   </style>
 </head>
 
-<body>
+<body class="stack-page">
 
-  <header class="site-header">
-    <div class="container nav-wrap">
+  <header class="navbar">
+    <div class="nav-container">
       <a href="index.html" class="brand">
-        <span class="brand-mark">◉</span>
+        <span class="brand-icon">◉</span>
         Autonomous Work Space
       </a>
 
-      <nav class="nav">
+      <nav class="nav-links">
         <a href="index.html">Home</a>
         <a href="agents.html">Agents</a>
         <a href="tools.html">Tools</a>
@@ -486,6 +486,7 @@
 
             <button
               class="goal-example"
+              type="button"
               data-example="Build a research workspace that continuously discovers emerging AI technologies, evaluates their usefulness, compares them with existing solutions, and produces concise research reports."
             >
               Research Workspace
@@ -493,6 +494,7 @@
 
             <button
               class="goal-example"
+              type="button"
               data-example="Build an automated content system that researches topics, identifies search opportunities, creates useful articles, publishes them, and monitors their performance."
             >
               Content System
@@ -500,6 +502,7 @@
 
             <button
               class="goal-example"
+              type="button"
               data-example="Build a coding workspace that analyzes software requirements, writes code, runs tests, detects problems, and continuously improves the implementation."
             >
               Coding Workspace
@@ -507,6 +510,7 @@
 
             <button
               class="goal-example"
+              type="button"
               data-example="Build an automated marketing system that discovers prospects, researches them, creates personalized outreach, tracks responses, and reports campaign performance."
             >
               Marketing System
@@ -1183,8 +1187,7 @@ function renderArchitecture(
 
           </div>
 
-      `;
-
+        `;
 
       if (
         agents.length
@@ -1477,7 +1480,6 @@ function renderArchitecture(
         <ul>
 
       `;
-
 
       html +=
         review.improvements.map(
@@ -1787,7 +1789,6 @@ async function buildStack() {
         </div>
 
       `;
-
 
     statusEl.textContent =
       "Workspace build failed.";
