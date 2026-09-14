@@ -593,590 +593,459 @@
     </div>
   </footer>
 
+      <script>
+const WORKER_URL =
+  "https://raspy-brook-525d.superagentic.workers.dev";
 
-  <script>
+let ecosystem = [];
 
-    const WORKER_URL =
-      "https://raspy-brook-525d.superagentic.workers.dev";
+const goalInput = document.getElementById("stack-goal");
+const buildButton = document.getElementById("build-stack");
+const statusEl = document.getElementById("builder-status");
+const analysisEl = document.getElementById("builder-analysis");
 
-    const goalInput =
-      document.getElementById("stack-goal");
+async function loadEcosystem() {
+  try {
+    const response = await fetch(WORKER_URL);
 
-    const buildButton =
-      document.getElementById("build-stack");
-
-    const statusEl =
-      document.getElementById("stack-status");
-
-    const analysisEl =
-      document.getElementById("builder-analysis");
-
-    const stackEl =
-      document.getElementById("generated-stack");
-
-
-    /*
-     * =========================================================
-     * HELPERS
-     * =========================================================
-     */
-
-    function escapeHtml(value) {
-      return String(value ?? "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
+    if (!response.ok) {
+      throw new Error("Could not load the ecosystem.");
     }
 
+    ecosystem = await response.json();
 
-    function setStatus(message, state = "") {
-      statusEl.textContent = message;
-      statusEl.className =
-        `builder-status ${state}`.trim();
+    if (!Array.isArray(ecosystem)) {
+      throw new Error("Invalid ecosystem response.");
     }
 
+    if (statusEl) {
+      statusEl.textContent =
+        `${ecosystem.length} agents and tools available.`;
+    }
+  } catch (error) {
+    console.error(error);
 
-    function findCatalogItem(name, ecosystem) {
-      const target =
-        String(name || "").trim().toLowerCase();
+    if (statusEl) {
+      statusEl.textContent =
+        "Could not load the Autonomous Work Space ecosystem.";
+    }
+  }
+}
 
-      return ecosystem.find(
-        item =>
-          String(item.Name || "")
-            .trim()
-            .toLowerCase() === target
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function renderCapabilityList(capabilities) {
+  if (!Array.isArray(capabilities) || !capabilities.length) {
+    return "";
+  }
+
+  return `
+    <div class="builder-capabilities">
+      ${capabilities.map(cap => `
+        <div class="builder-capability">
+          <strong>${escapeHtml(cap.name)}</strong>
+          <span>${escapeHtml(cap.reason)}</span>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+function renderLayers(layers) {
+  if (!Array.isArray(layers) || !layers.length) {
+    return `
+      <div class="empty">
+        No workspace layers were produced.
+      </div>
+    `;
+  }
+
+  return layers.map(layer => `
+    <article class="stack-layer">
+
+      <div class="stack-layer-number">
+        ${String(layer.number).padStart(2, "0")} —
+        WORKSPACE LAYER
+      </div>
+
+      <h3>${escapeHtml(layer.name)}</h3>
+
+      <p class="stack-layer-purpose">
+        ${escapeHtml(layer.purpose)}
+      </p>
+
+      <div class="stack-layer-why">
+        <strong>Why this layer exists:</strong>
+        ${escapeHtml(layer.why_needed)}
+      </div>
+
+      ${
+        Array.isArray(layer.agents) && layer.agents.length
+          ? `
+            <div class="stack-components">
+              <h4>Selected Agents</h4>
+
+              ${layer.agents.map(agent => `
+                <div class="stack-component">
+                  <strong>${escapeHtml(agent.name)}</strong>
+                  <p>
+                    Why selected:
+                    ${escapeHtml(agent.reason)}
+                  </p>
+                </div>
+              `).join("")}
+            </div>
+          `
+          : ""
+      }
+
+      ${
+        Array.isArray(layer.tools) && layer.tools.length
+          ? `
+            <div class="stack-components">
+              <h4>Selected Tools</h4>
+
+              ${layer.tools.map(tool => `
+                <div class="stack-component">
+                  <strong>${escapeHtml(tool.name)}</strong>
+                  <p>
+                    Why selected:
+                    ${escapeHtml(tool.reason)}
+                  </p>
+                </div>
+              `).join("")}
+            </div>
+          `
+          : ""
+      }
+
+    </article>
+  `).join("");
+}
+
+function renderImprovements(improvements) {
+  if (!Array.isArray(improvements) || !improvements.length) {
+    return "";
+  }
+
+  return `
+    <section class="builder-result-section builder-improvements">
+      <div class="builder-result-label">
+        IMPROVEMENTS MADE
+      </div>
+
+      <h2>How the workspace was improved</h2>
+
+      <div class="builder-improvement-list">
+        ${improvements.map(item => `
+          <div class="builder-improvement">
+            <span class="builder-improvement-type">
+              ${escapeHtml(item.type)}
+            </span>
+
+            <div>
+              <strong>${escapeHtml(item.component)}</strong>
+              <p>${escapeHtml(item.reason)}</p>
+            </div>
+          </div>
+        `).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function renderExternalCandidates(candidates) {
+  if (!Array.isArray(candidates) || !candidates.length) {
+    return "";
+  }
+
+  return `
+    <section class="builder-result-section builder-external">
+      <div class="builder-result-label">
+        DISCOVERED OPTIONS
+      </div>
+
+      <h2>Other candidates considered</h2>
+
+      <p class="builder-section-intro">
+        These were identified during the improvement pass but were
+        not necessarily selected as core components.
+      </p>
+
+      <div class="builder-external-list">
+        ${candidates.map(item => `
+          <div class="builder-external-item">
+
+            <div>
+              <strong>${escapeHtml(item.name)}</strong>
+              <span>
+                ${escapeHtml(item.type)}
+              </span>
+            </div>
+
+            <p>
+              ${escapeHtml(item.reason)}
+            </p>
+
+            ${
+              item.url
+                ? `
+                  <a
+                    href="${escapeHtml(item.url)}"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Explore →
+                  </a>
+                `
+                : ""
+            }
+
+          </div>
+        `).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function renderGaps(gaps) {
+  if (!Array.isArray(gaps) || !gaps.length) {
+    return `
+      <section class="builder-no-gaps">
+        <strong>✓ No critical capability gaps remain.</strong>
+        <p>
+          The final architecture can adequately satisfy the requested goal
+          with the selected components.
+        </p>
+      </section>
+    `;
+  }
+
+  return `
+    <section class="builder-gaps">
+
+      <div class="builder-gap-title">
+        ⚠ CAPABILITY GAPS REMAIN
+      </div>
+
+      <p>
+        These capabilities could not be adequately satisfied even
+        after the improvement pass.
+      </p>
+
+      <div class="builder-gap-list">
+        ${gaps.map(gap => `
+          <div class="builder-gap">
+            <strong>${escapeHtml(gap.capability)}</strong>
+            <span>${escapeHtml(gap.reason)}</span>
+          </div>
+        `).join("")}
+      </div>
+
+    </section>
+  `;
+}
+
+function renderProcessStatus(process) {
+  if (!process) return "";
+
+  const discovery =
+    process.external_discovery_attempted
+      ? "External candidate research attempted"
+      : "No external discovery required";
+
+  const finalBuild =
+    process.final_rebuild_completed
+      ? "Final architecture rebuilt"
+      : "Initial architecture retained";
+
+  return `
+    <div class="workflow-build-summary">
+      <span>STACK BUILDER V3.1</span>
+      <p>
+        Initial architecture → critic review → ${discovery}
+        → ${finalBuild}.
+      </p>
+    </div>
+  `;
+}
+
+function renderArchitecture(result) {
+  const architecture = result.architecture;
+
+  analysisEl.innerHTML = `
+
+    <section class="builder-result-section">
+
+      <div class="builder-result-label">
+        WORKSPACE UNDERSTANDING
+      </div>
+
+      <h2>
+        ${escapeHtml(architecture.goal_summary)}
+      </h2>
+
+      <div class="builder-result-label capability-heading">
+        REQUIRED CAPABILITIES
+      </div>
+
+      ${renderCapabilityList(
+        architecture.core_capabilities
+      )}
+
+    </section>
+
+    ${renderLayers(architecture.layers)}
+
+    ${renderImprovements(
+      architecture.improvements
+    )}
+
+    ${renderExternalCandidates(
+      architecture.external_candidates
+    )}
+
+    ${renderGaps(
+      architecture.gaps
+    )}
+
+    <section class="builder-result-section">
+
+      <div class="builder-result-label">
+        ARCHITECTURE LOGIC
+      </div>
+
+      <p class="architecture-summary">
+        ${escapeHtml(
+          architecture.architecture_summary
+        )}
+      </p>
+
+      ${
+        architecture.review_summary
+          ? `
+            <div class="builder-review-summary">
+              <strong>Final review:</strong>
+              ${escapeHtml(
+                architecture.review_summary
+              )}
+            </div>
+          `
+          : ""
+      }
+
+    </section>
+
+    ${renderProcessStatus(result.process)}
+  `;
+}
+
+async function buildStack() {
+  const goal = goalInput.value.trim();
+
+  if (!goal) {
+    statusEl.textContent =
+      "Tell the workspace what you want to build first.";
+    goalInput.focus();
+    return;
+  }
+
+  if (!ecosystem.length) {
+    statusEl.textContent =
+      "The workspace ecosystem is not available yet.";
+    return;
+  }
+
+  buildButton.disabled = true;
+  buildButton.innerHTML =
+    `Building workspace <span>...</span>`;
+
+  analysisEl.innerHTML = `
+    <div class="builder-progress">
+
+      <div>01 — Understanding your goal...</div>
+      <div>02 — Building an initial workspace...</div>
+      <div>03 — Critically reviewing the architecture...</div>
+      <div>04 — Checking for better or missing capabilities...</div>
+      <div>05 — Improving the workspace...</div>
+
+    </div>
+  `;
+
+  statusEl.textContent =
+    "The workspace architect is reasoning through your goal.";
+
+  try {
+    const response = await fetch(
+      `${WORKER_URL}/build-stack`,
+      {
+        method: "POST",
+
+        headers: {
+          "Content-Type": "application/json"
+        },
+
+        body: JSON.stringify({
+          goal,
+          ecosystem
+        })
+      }
+    );
+
+    const result = await response.json();
+
+    if (!response.ok || !result.success) {
+      throw new Error(
+        result.details ||
+        result.error ||
+        "Workspace could not be built."
       );
     }
 
-
-    /*
-     * =========================================================
-     * GOAL EXAMPLES
-     * =========================================================
-     */
-
-    document
-      .querySelectorAll(".goal-example")
-      .forEach(button => {
-
-        button.addEventListener("click", () => {
-
-          goalInput.value =
-            button.dataset.goal || "";
-
-          goalInput.focus();
-
-        });
-
-      });
-
-
-    /*
-     * =========================================================
-     * LOAD LIVE ECOSYSTEM
-     * =========================================================
-     */
-
-    async function loadEcosystem() {
-
-      const response =
-        await fetch(WORKER_URL);
-
-      if (!response.ok) {
-        throw new Error(
-          "Could not load the Autonomous Work Space ecosystem."
-        );
-      }
-
-      const data =
-        await response.json();
-
-      if (!Array.isArray(data)) {
-        throw new Error(
-          "The ecosystem returned an invalid response."
-        );
-      }
-
-      return data;
-    }
-
-
-    /*
-     * =========================================================
-     * RENDER ANALYSIS
-     * =========================================================
-     */
-
-    function renderAnalysis(architecture) {
-
-      const capabilities =
-        Array.isArray(architecture.core_capabilities)
-          ? architecture.core_capabilities
-          : [];
-
-      analysisEl.innerHTML = `
-        <div class="analysis-box">
-
-          <div class="analysis-label">
-            Workspace Understanding
-          </div>
-
-          <div class="analysis-summary">
-            ${escapeHtml(
-              architecture.goal_summary ||
-              "The system analyzed the supplied workspace goal."
-            )}
-          </div>
-
-          ${
-            capabilities.length
-              ? `
-                <div class="analysis-label" style="margin-top:25px;">
-                  Required Capabilities
-                </div>
-
-                <div class="capability-list">
-
-                  ${capabilities.map(cap => `
-                    <div class="capability-item">
-
-                      <strong>
-                        ${escapeHtml(cap.name)}
-                      </strong>
-
-                      <span>
-                        ${escapeHtml(cap.reason)}
-                      </span>
-
-                    </div>
-                  `).join("")}
-
-                </div>
-              `
-              : ""
-          }
-
-        </div>
-      `;
-    }
-
-
-    /*
-     * =========================================================
-     * COMPONENT RENDERING
-     * =========================================================
-     */
-
-    function renderComponent(
-      component,
-      ecosystem
-    ) {
-
-      const item =
-        findCatalogItem(
-          component.name,
-          ecosystem
-        );
-
-      const type =
-        item?.Type || "Component";
-
-      const url =
-        item?.URL || "";
-
-      return `
-        <div class="component">
-
-          <div class="component-name">
-            ${escapeHtml(component.name)}
-
-            <span class="component-type">
-              ${escapeHtml(type)}
-            </span>
-          </div>
-
-          <div class="component-reason">
-            <strong>Why selected:</strong>
-            ${escapeHtml(component.reason)}
-          </div>
-
-          ${
-            url
-              ? `
-                <a
-                  class="component-link"
-                  href="${escapeHtml(url)}"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Open capability →
-                </a>
-              `
-              : ""
-          }
-
-        </div>
-      `;
-    }
-
-
-    /*
-     * =========================================================
-     * RENDER STACK
-     * =========================================================
-     */
-
-    function renderStack(
-      architecture,
-      ecosystem
-    ) {
-
-      const layers =
-        Array.isArray(architecture.layers)
-          ? architecture.layers
-          : [];
-
-      const gaps =
-        Array.isArray(architecture.gaps)
-          ? architecture.gaps
-          : [];
-
-
-      if (!layers.length) {
-
-        stackEl.innerHTML = `
-          <div class="empty-builder">
-            The reasoning system did not produce a usable workspace
-            architecture. Try a more detailed goal.
-          </div>
-        `;
-
-        return;
-      }
-
-
-      stackEl.innerHTML =
-        layers.map((layer, index) => {
-
-          const agents =
-            Array.isArray(layer.agents)
-              ? layer.agents
-              : [];
-
-          const tools =
-            Array.isArray(layer.tools)
-              ? layer.tools
-              : [];
-
-          return `
-            <article class="generated-layer">
-
-              <div class="generated-layer-number">
-                ${String(index + 1).padStart(2, "0")}
-                — WORKSPACE LAYER
-              </div>
-
-              <h3>
-                ${escapeHtml(layer.name)}
-              </h3>
-
-              <p class="layer-purpose">
-                ${escapeHtml(layer.purpose)}
-              </p>
-
-              <div class="layer-why">
-                <strong>Why this layer exists:</strong>
-                ${escapeHtml(layer.why_needed)}
-              </div>
-
-
-              ${
-                agents.length
-                  ? `
-                    <div class="component-group">
-
-                      <div class="component-group-title">
-                        Selected Agents
-                      </div>
-
-                      ${agents.map(agent =>
-                        renderComponent(
-                          agent,
-                          ecosystem
-                        )
-                      ).join("")}
-
-                    </div>
-                  `
-                  : ""
-              }
-
-
-              ${
-                tools.length
-                  ? `
-                    <div class="component-group">
-
-                      <div class="component-group-title">
-                        Selected Tools
-                      </div>
-
-                      ${tools.map(tool =>
-                        renderComponent(
-                          tool,
-                          ecosystem
-                        )
-                      ).join("")}
-
-                    </div>
-                  `
-                  : ""
-              }
-
-
-              ${
-                !agents.length && !tools.length
-                  ? `
-                    <div class="layer-why">
-                      <strong>No current directory component selected.</strong>
-                      The architecture identifies this capability, but the
-                      current ecosystem does not contain a sufficiently strong
-                      match.
-                    </div>
-                  `
-                  : ""
-              }
-
-            </article>
-          `;
-
-        }).join("");
-
-
-      if (gaps.length) {
-
-        stackEl.innerHTML += `
-
-          <div class="gap-box">
-
-            <h3>
-              ⚠ Capability Gaps Detected
-            </h3>
-
-            ${gaps.map(gap => `
-              <div class="gap-item">
-
-                <strong>
-                  ${escapeHtml(gap.capability)}
-                </strong>
-
-                — ${escapeHtml(gap.reason)}
-
-              </div>
-            `).join("")}
-
-          </div>
-
-        `;
-      }
-
-
-      if (architecture.architecture_summary) {
-
-        stackEl.innerHTML += `
-
-          <div class="architecture-summary">
-
-            <span>
-              Architecture Logic
-            </span>
-
-            <p>
-              ${escapeHtml(
-                architecture.architecture_summary
-              )}
-            </p>
-
-          </div>
-
-        `;
-      }
-
-    }
-
-
-    /*
-     * =========================================================
-     * BUILD
-     * =========================================================
-     */
-
-    async function buildStack() {
-
-      const goal =
-        goalInput.value.trim();
-
-
-      if (!goal) {
-
-        setStatus(
-          "Describe what you want your autonomous workspace to accomplish.",
-          "error"
-        );
-
-        goalInput.focus();
-
-        return;
-      }
-
-
-      buildButton.disabled = true;
-
-      buildButton.style.opacity = "0.65";
-
-      analysisEl.innerHTML = "";
-
-      stackEl.innerHTML = "";
-
-
-      try {
-
-        setStatus(
-          "Loading the current autonomous ecosystem...",
-          "active"
-        );
-
-
-        const ecosystem =
-          await loadEcosystem();
-
-
-        if (!ecosystem.length) {
-          throw new Error(
-            "The Autonomous Work Space directory is currently empty."
-          );
-        }
-
-
-        setStatus(
-          "The reasoning system is analyzing your goal and designing the workspace...",
-          "active"
-        );
-
-
-        const response =
-          await fetch(
-            `${WORKER_URL}/build-stack`,
-            {
-              method: "POST",
-
-              headers: {
-                "Content-Type": "application/json"
-              },
-
-              body: JSON.stringify({
-                goal,
-                ecosystem
-              })
-            }
-          );
-
-
-        const data =
-          await response.json();
-
-
-        if (!response.ok) {
-
-          throw new Error(
-            data.error ||
-            "The workspace architect failed."
-          );
-
-        }
-
-
-        if (!data.success ||
-            !data.architecture) {
-
-          throw new Error(
-            "The reasoning system returned no architecture."
-          );
-
-        }
-
-
-        renderAnalysis(
-          data.architecture
-        );
-
-
-        renderStack(
-          data.architecture,
-          ecosystem
-        );
-
-
-        const layerCount =
-          Array.isArray(
-            data.architecture.layers
-          )
-            ? data.architecture.layers.length
-            : 0;
-
-
-        setStatus(
-          `Workspace architecture created with ${layerCount} dynamically designed layer${layerCount === 1 ? "" : "s"}.`,
-          ""
-        );
-
-
-        window.scrollTo({
-          top:
-            analysisEl.getBoundingClientRect().top +
-            window.scrollY -
-            80,
-          behavior: "smooth"
-        });
-
-
-      } catch (error) {
-
-        console.error(error);
-
-        setStatus(
-          error.message ||
-          "Something went wrong while building the workspace.",
-          "error"
-        );
-
-
-        stackEl.innerHTML = `
-          <div class="empty-builder">
-            The workspace could not be built.
-            Check the Worker configuration and try again.
-          </div>
-        `;
-
-      } finally {
-
-        buildButton.disabled = false;
-
-        buildButton.style.opacity = "1";
-
-      }
-
-    }
-
-
-    buildButton.addEventListener(
-      "click",
-      buildStack
-    );
-
-  </script>
+    renderArchitecture(result);
+
+    statusEl.textContent =
+      "Workspace architecture created and improved.";
+
+  } catch (error) {
+    console.error(error);
+
+    analysisEl.innerHTML = `
+      <div class="builder-error">
+        <strong>
+          Workspace could not be built.
+        </strong>
+
+        <p>
+          ${escapeHtml(error.message)}
+        </p>
+      </div>
+    `;
+
+    statusEl.textContent =
+      "The workspace builder encountered an error.";
+
+  } finally {
+    buildButton.disabled = false;
+    buildButton.innerHTML =
+      `Build My Stack <span>→</span>`;
+  }
+}
+
+buildButton.addEventListener(
+  "click",
+  buildStack
+);
+
+loadEcosystem();
+</script>    
 
 </body>
   </html>
