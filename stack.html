@@ -14,12 +14,27 @@
       margin: 0 auto;
     }
 
+
+    .hero-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 28px;
+    }
+
+    .goal-example:focus-visible,
+    #stack-goal:focus-visible,
+    #build-stack:focus-visible {
+      outline: 2px solid var(--blue);
+      outline-offset: 3px;
+    }
+
     .stack-goal-box {
       margin-top: 30px;
       padding: 28px;
-      border: 1px solid rgba(70, 179, 255, 0.18);
-      border-radius: 18px;
-      background: rgba(70, 179, 255, 0.035);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 14px;
+      background: rgba(255,255,255,0.025);
     }
 
     .stack-goal-label {
@@ -38,8 +53,8 @@
       resize: vertical;
       padding: 18px;
       border: 1px solid rgba(255,255,255,0.1);
-      border-radius: 12px;
-      background: rgba(0,0,0,0.25);
+      border-radius: 10px;
+      background: rgba(0,0,0,0.16);
       color: var(--text);
       font-family: inherit;
       font-size: 0.98rem;
@@ -100,9 +115,9 @@
 
     .analysis-box {
       padding: 24px;
-      border: 1px solid rgba(70,179,255,0.14);
-      border-radius: 16px;
-      background: rgba(70,179,255,0.025);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 14px;
+      background: rgba(255,255,255,0.025);
     }
 
     .analysis-label {
@@ -154,7 +169,7 @@
     .generated-layer {
       padding: 25px;
       border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 16px;
+      border-radius: 14px;
       background: rgba(255,255,255,0.025);
     }
 
@@ -306,6 +321,15 @@
     }
 
     @media (max-width: 700px) {
+      .hero-buttons {
+        align-items: stretch;
+      }
+
+      .hero-buttons .button {
+        width: 100%;
+        text-align: center;
+      }
+
       .stack-goal-box {
         padding: 20px;
       }
@@ -363,6 +387,9 @@
         <div class="hero-buttons">
           <a href="agents.html" class="button button-secondary">
             Explore Agents
+          </a>
+          <a href="tools.html" class="button button-secondary">
+            Explore Tools
           </a>
         </div>
 
@@ -526,12 +553,6 @@
           class="generated-stack-v3"
         ></div>
 
-        <p class="builder-note">
-          The workspace starts with the live directory, evaluates whether the
-          available ecosystem can satisfy the goal, and reports or researches
-          unresolved capability gaps rather than pretending a weak match is sufficient.
-        </p>
-
       </div>
     </section>
 
@@ -664,8 +685,8 @@ async function loadEcosystem() {
 
     statusEl.textContent =
       ecosystem.length
-        ? `${ecosystem.length} capabilities available in the current ecosystem.`
-        : "No capabilities are currently available.";
+        ? "Ecosystem ready. Describe your workspace goal and build the stack."
+        : "No agents or tools are currently available.";
 
 
   } catch (error) {
@@ -1892,4 +1913,4 @@ loadEcosystem();
 </script>
 
 </body>
-  </html>
+</html>
