@@ -1,501 +1,272 @@
 export default {
-
   async fetch(request, env) {
-
     const corsHeaders = {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type",
     };
 
-
-    /*
-    ==========================================================
-    CORS
-    ==========================================================
-    */
-
     if (request.method === "OPTIONS") {
-
       return new Response(null, {
         status: 204,
         headers: corsHeaders,
       });
-
     }
-
 
     if (!["GET", "POST"].includes(request.method)) {
-
-      return new Response(
-        JSON.stringify({
-          error: "Method not allowed",
-        }),
-        {
-          status: 405,
-          headers: {
-            ...corsHeaders,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
+      return new Response("Method not allowed", {
+        status: 405,
+        headers: corsHeaders,
+      });
     }
 
-
     try {
-
-
       /*
-      ==========================================================
-      GET
-      Return Autonomous Work Space ecosystem from Airtable
-      ==========================================================
-      */
+       * ============================================================
+       * GET — LOAD AUTONOMOUS WORK SPACE ECOSYSTEM
+       * ============================================================
+       */
 
       if (request.method === "GET") {
-
-        const BASE_ID =
-          "appY6TPhOsmj3dIX8";
-
-        const TABLE_NAME =
-          "Table 1";
-
+        const BASE_ID = "appY6TPhOsmj3dIX8";
+        const TABLE_NAME = "Table 1";
 
         const airtableUrl =
           `https://api.airtable.com/v0/${BASE_ID}/${encodeURIComponent(TABLE_NAME)}?maxRecords=100`;
 
-
-        const response =
-          await fetch(
-            airtableUrl,
-            {
-              headers: {
-                Authorization:
-                  `Bearer ${env.AIRTABLE_TOKEN}`,
-                "Content-Type":
-                  "application/json",
-              },
-            }
-          );
-
+        const response = await fetch(airtableUrl, {
+          headers: {
+            Authorization: `Bearer ${env.AIRTABLE_TOKEN}`,
+            "Content-Type": "application/json",
+          },
+        });
 
         if (!response.ok) {
-
-          const errorText =
-            await response.text();
-
           return new Response(
             JSON.stringify({
-              error:
-                "Failed to fetch ecosystem from Airtable.",
-              details:
-                errorText.slice(0, 500),
+              error: "Failed to fetch from Airtable",
             }),
             {
-              status:
-                response.status,
-
+              status: response.status,
               headers: {
                 ...corsHeaders,
-                "Content-Type":
-                  "application/json",
+                "Content-Type": "application/json",
               },
             }
           );
-
         }
 
+        const data = await response.json();
 
-        const data =
-          await response.json();
+        const items = data.records.map((record) => ({
+          id: record.id,
+          Name: record.fields.Name || "Untitled",
+          Type: record.fields.Type || "Unknown",
+          Description: record.fields.Description || "",
+          URL: record.fields.URL || "",
+          Category: record.fields.Category || "Uncategorized",
+          created: record.createdTime,
+        }));
 
-
-        const items =
-          data.records.map(
-            record => ({
-
-              id:
-                record.id,
-
-              Name:
-                record.fields.Name ||
-                "Untitled",
-
-              Type:
-                record.fields.Type ||
-                "Unknown",
-
-              Description:
-                record.fields.Description ||
-                "",
-
-              URL:
-                record.fields.URL ||
-                "",
-
-              Category:
-                record.fields.Category ||
-                "Uncategorized",
-
-              created:
-                record.createdTime,
-
-            })
-          );
-
-
-        return new Response(
-          JSON.stringify(
-            items,
-            null,
-            2
-          ),
-          {
-            headers: {
-              ...corsHeaders,
-
-              "Content-Type":
-                "application/json",
-
-              "Cache-Control":
-                "no-store",
-            },
-          }
-        );
-
+        return new Response(JSON.stringify(items, null, 2), {
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+            "Cache-Control": "public, max-age=300",
+          },
+        });
       }
 
-
       /*
-      ==========================================================
-      POST ROUTING
-      ==========================================================
-      */
+       * ============================================================
+       * POST /build-stack
+       * ============================================================
+       */
 
-      const url =
-        new URL(
-          request.url
-        );
+      const url = new URL(request.url);
 
-
-      if (
-        url.pathname !== "/build-stack"
-      ) {
-
+      if (url.pathname !== "/build-stack") {
         return new Response(
           JSON.stringify({
-            error:
-              "Unknown endpoint",
+            error: "Unknown endpoint",
           }),
           {
             status: 404,
-
             headers: {
               ...corsHeaders,
-
-              "Content-Type":
-                "application/json",
+              "Content-Type": "application/json",
             },
           }
         );
-
       }
 
-
-      /*
-      ==========================================================
-      CHECK OPENROUTER KEY
-      ==========================================================
-      */
-
       if (!env.OPENROUTER_KEY) {
-
         return new Response(
           JSON.stringify({
-            error:
-              "OPENROUTER_KEY is not configured on the Worker.",
+            error: "OPENROUTER_KEY is not configured on the Worker.",
           }),
           {
             status: 500,
-
             headers: {
               ...corsHeaders,
-
-              "Content-Type":
-                "application/json",
+              "Content-Type": "application/json",
             },
           }
         );
-
       }
 
-
       /*
-      ==========================================================
-      READ REQUEST
-      ==========================================================
-      */
+       * ============================================================
+       * READ REQUEST
+       * ============================================================
+       */
 
       let body;
 
-
       try {
-
-        body =
-          await request.json();
-
+        body = await request.json();
       } catch {
-
         return new Response(
           JSON.stringify({
-            error:
-              "Invalid JSON request.",
+            error: "Invalid JSON request.",
           }),
           {
             status: 400,
-
             headers: {
               ...corsHeaders,
-
-              "Content-Type":
-                "application/json",
+              "Content-Type": "application/json",
             },
           }
         );
-
       }
 
+      const goal = String(body.goal || "").trim();
 
-      const goal =
-        String(
-          body.goal || ""
-        ).trim();
-
-
-      const ecosystem =
-        Array.isArray(
-          body.ecosystem
-        )
-          ? body.ecosystem
-          : [];
-
+      const ecosystem = Array.isArray(body.ecosystem)
+        ? body.ecosystem
+        : [];
 
       if (!goal) {
-
         return new Response(
           JSON.stringify({
-            error:
-              "A workspace goal is required.",
+            error: "A workspace goal is required.",
           }),
           {
             status: 400,
-
             headers: {
               ...corsHeaders,
-
-              "Content-Type":
-                "application/json",
+              "Content-Type": "application/json",
             },
           }
         );
-
       }
-
 
       if (!ecosystem.length) {
-
         return new Response(
           JSON.stringify({
-            error:
-              "No ecosystem data was supplied.",
+            error: "No ecosystem data was supplied.",
           }),
           {
             status: 400,
-
             headers: {
               ...corsHeaders,
-
-              "Content-Type":
-                "application/json",
+              "Content-Type": "application/json",
             },
           }
         );
-
       }
 
+      /*
+       * ============================================================
+       * PREPARE CATALOG
+       * ============================================================
+       */
+
+      const catalog = ecosystem
+        .slice(0, 100)
+        .map((item, index) => ({
+          index,
+          name: item.Name || "",
+          type: item.Type || "",
+          category: item.Category || "",
+          description: item.Description || "",
+          url: item.URL || "",
+        }));
 
       /*
-      ==========================================================
-      BUILD VERIFIED CATALOG
-      ==========================================================
-      */
+       * ============================================================
+       * SYSTEM PROMPT
+       * ============================================================
+       */
 
-      const catalog =
-        ecosystem
-          .slice(0, 100)
-          .map(
-            item => ({
+      const systemPrompt = `
+You are the autonomous workspace architect for "Autonomous Work Space".
 
-              name:
-                String(
-                  item.Name ||
-                  item.name ||
-                  ""
-                ),
+Your job is to transform a user's real-world automation goal into a practical autonomous workspace architecture.
 
-              type:
-                String(
-                  item.Type ||
-                  item.type ||
-                  ""
-                ),
+IMPORTANT RULES:
 
-              category:
-                String(
-                  item.Category ||
-                  item.category ||
-                  ""
-                ),
+1. Do NOT force every goal into a fixed seven-layer template.
+2. Create only the layers that genuinely make sense for this particular goal.
+3. The number of layers can vary.
+4. Each layer must represent a meaningful capability or stage of work.
+5. Select agents and tools ONLY from the supplied catalog.
+6. Never invent an agent, tool, product, capability, URL, or name.
+7. A component may be selected only when its description/category reasonably supports the required job.
+8. If the catalog lacks a necessary capability, explicitly report a capability gap.
+9. Explain WHY each layer exists.
+10. Explain WHY every selected agent or tool was selected.
+11. Reason from the user's actual goal, not from generic directory categories.
+12. Prefer a small number of strong components over filling every layer with weak matches.
+13. The architecture should describe what the workspace needs to accomplish, not merely list software.
+14. Be honest when the current catalog cannot fully satisfy the goal.
+15. Do not claim that a tool performs a capability that its supplied description does not support.
+16. Think carefully before selecting components.
+17. The quality of the reasoning is more important than the number of components.
+18. Do not create artificial layers just to make the architecture longer.
 
-              description:
-                String(
-                  item.Description ||
-                  item.description ||
-                  ""
-                ),
-
-              url:
-                String(
-                  item.URL ||
-                  item.url ||
-                  ""
-                ),
-
-            })
-          )
-          .filter(
-            item =>
-              item.name
-          );
-
-
-      /*
-      ==========================================================
-      SYSTEM PROMPT
-      ==========================================================
-      */
-
-      const systemPrompt =
-`
-You are the autonomous workspace architect for Autonomous Work Space.
-
-You design practical AI-powered workspaces using the actual agents and tools available in the supplied catalog.
-
-You must reason carefully about the user's goal and create a useful architecture.
-
-CRITICAL RULES:
-
-1. Understand the user's actual goal before selecting anything.
-
-2. Do NOT force the goal into a fixed seven-layer template.
-
-3. Create only the layers genuinely required.
-
-4. The number of layers can vary.
-
-5. Select components ONLY from the supplied catalog.
-
-6. Never invent a product, agent, tool, company, URL or capability.
-
-7. Only select a catalog item when its supplied description reasonably supports the job.
-
-8. Every layer must explain why that layer exists.
-
-9. Every selected component must explain why it was selected.
-
-10. Prefer strong matches over simply filling layers.
-
-11. Identify genuine missing capabilities.
-
-12. After creating the architecture, review your own architecture.
-
-13. Check whether:
-    - selected components actually match their jobs
-    - important capabilities are missing
-    - duplicate components are unnecessary
-    - layers are logically ordered
-    - a better component already exists in the supplied catalog
-
-14. Refine the architecture after the review.
-
-15. Do not claim that a component can do something unsupported by its supplied description.
-
-16. A capability gap means the supplied catalog does not adequately satisfy an important requirement.
-
-17. Do not search the web.
-    You are evaluating the supplied Autonomous Work Space ecosystem in this version.
-
-18. Return ONLY valid JSON.
-
-The final architecture should be the result of:
-GOAL UNDERSTANDING
-→ INITIAL ARCHITECTURE
-→ ECOSYSTEM MATCHING
-→ SELF-EVALUATION
-→ REFINED ARCHITECTURE
+Return ONLY valid JSON matching the requested schema.
 `;
 
-
       /*
-      ==========================================================
-      USER PROMPT
-      ==========================================================
-      */
+       * ============================================================
+       * USER PROMPT
+       * ============================================================
+       */
 
-      const userPrompt =
-`
-USER GOAL:
+      const userPrompt = `
+USER WORKSPACE GOAL:
 
 ${goal}
-
 
 CURRENT AUTONOMOUS WORK SPACE CATALOG:
 
 ${JSON.stringify(catalog, null, 2)}
 
+Create the autonomous workspace architecture for this goal.
 
-Create and then internally review the workspace architecture.
-
-Return ONLY JSON using exactly this structure:
+Return JSON using exactly this structure:
 
 {
-  "goal_summary": "short explanation of what the user wants to build",
-
+  "goal_summary": "short explanation of what the user is trying to build",
   "core_capabilities": [
     {
       "name": "capability name",
-      "reason": "why this capability is needed"
+      "reason": "why this capability is required"
     }
   ],
-
   "layers": [
     {
       "number": 1,
-
       "name": "meaningful layer name",
-
       "purpose": "what this layer does",
-
-      "why_needed": "why this layer is necessary for this particular user goal",
-
+      "why_needed": "why this layer is necessary for this particular goal",
       "agents": [
         {
           "name": "exact catalog name",
           "reason": "why this agent is appropriate"
         }
       ],
-
       "tools": [
         {
           "name": "exact catalog name",
@@ -504,476 +275,376 @@ Return ONLY JSON using exactly this structure:
       ]
     }
   ],
-
   "gaps": [
     {
       "capability": "missing capability",
-      "reason": "why the current catalog does not adequately provide it"
+      "reason": "why the current catalog cannot adequately provide it"
     }
   ],
-
-  "review": {
-    "summary": "brief explanation of how the architecture was checked and refined",
-
-    "improvements": [
-      "improvement made during self-review"
-    ]
-  },
-
-  "architecture_summary": "explanation of how all layers work together"
+  "architecture_summary": "short explanation of how the selected layers work together"
 }
 
-
-IMPORTANT:
-
-- The component names must exactly match names from the supplied catalog.
-- Do not select every available component.
-- Empty agents or tools arrays are allowed.
-- If there are no important gaps, return an empty gaps array.
-- Do not invent gaps.
-- Perform the architecture review internally before returning the final JSON.
-- Do not return your internal reasoning.
-- Return only the final refined architecture JSON.
+Do not include markdown.
+Do not include commentary outside the JSON.
 `;
 
-
       /*
-      ==========================================================
-      OPENROUTER REQUEST
-      ==========================================================
-      */
+       * ============================================================
+       * FREE MODEL DISCOVERY
+       *
+       * We keep openrouter/free as the first choice.
+       * If it returns an empty/invalid result, we discover actual
+       * free models and try them individually.
+       * ============================================================
+       */
 
-      const controller =
-        new AbortController();
-
-
-      const timeout =
-        setTimeout(
-          () =>
-            controller.abort(),
-          90000
-        );
-
-
-      let openrouterResponse;
-
-
-      try {
-
-        openrouterResponse =
-          await fetch(
-            "https://openrouter.ai/api/v1/chat/completions",
+      async function getFreeModels() {
+        try {
+          const response = await fetch(
+            "https://openrouter.ai/api/v1/models",
             {
-
-              method:
-                "POST",
-
               headers: {
-
-                Authorization:
-                  `Bearer ${env.OPENROUTER_KEY}`,
-
-                "Content-Type":
-                  "application/json",
-
-                "HTTP-Referer":
-                  "https://autonomouswork.space",
-
-                "X-Title":
-                  "Autonomous Work Space",
-
+                Authorization: `Bearer ${env.OPENROUTER_KEY}`,
               },
-
-              body:
-                JSON.stringify({
-
-                  model:
-                    "openrouter/free",
-
-                  messages: [
-
-                    {
-                      role:
-                        "system",
-
-                      content:
-                        systemPrompt,
-                    },
-
-                    {
-                      role:
-                        "user",
-
-                      content:
-                        userPrompt,
-                    },
-
-                  ],
-
-                  temperature:
-                    0.2,
-
-                  max_tokens:
-                    6000,
-
-                }),
-
-              signal:
-                controller.signal,
-
             }
           );
 
-      } finally {
+          if (!response.ok) {
+            return [];
+          }
 
-        clearTimeout(
-          timeout
-        );
+          const data = await response.json();
 
+          if (!Array.isArray(data.data)) {
+            return [];
+          }
+
+          const freeModels = data.data
+            .filter((model) => {
+              const id = String(model.id || "");
+
+              /*
+               * Explicit :free models are free.
+               */
+              if (id.endsWith(":free")) {
+                return true;
+              }
+
+              /*
+               * Some models expose zero pricing directly.
+               */
+              const promptPrice =
+                Number(model?.pricing?.prompt || 0);
+
+              const completionPrice =
+                Number(model?.pricing?.completion || 0);
+
+              return (
+                promptPrice === 0 &&
+                completionPrice === 0
+              );
+            })
+            .map((model) => model.id)
+            .filter(Boolean);
+
+          return [...new Set(freeModels)];
+        } catch {
+          return [];
+        }
       }
 
+      /*
+       * ============================================================
+       * BUILD MODEL CANDIDATE LIST
+       * ============================================================
+       *
+       * openrouter/free is intentionally first.
+       */
+
+      const discoveredFreeModels = await getFreeModels();
+
+      const modelCandidates = [
+        "openrouter/free",
+        ...discoveredFreeModels,
+      ];
+
+      const uniqueModels = [
+        ...new Set(modelCandidates),
+      ];
 
       /*
-      ==========================================================
-      OPENROUTER ERROR
-      ==========================================================
-      */
+       * Keep the retry system controlled.
+       *
+       * We don't want a single build to hammer OpenRouter.
+       */
 
-      if (!openrouterResponse.ok) {
+      const MAX_MODEL_ATTEMPTS = Math.min(
+        uniqueModels.length,
+        8
+      );
 
-        const errorText =
-          await openrouterResponse.text();
+      /*
+       * ============================================================
+       * OPENROUTER REQUEST FUNCTION
+       * ============================================================
+       */
 
-
-        return new Response(
-          JSON.stringify({
-
-            error:
-              "OpenRouter request failed.",
-
-            details:
-              errorText.slice(
-                0,
-                1500
-              ),
-
-          }),
+      async function callModel(model) {
+        const response = await fetch(
+          "https://openrouter.ai/api/v1/chat/completions",
           {
-
-            status:
-              502,
-
+            method: "POST",
             headers: {
-
-              ...corsHeaders,
-
-              "Content-Type":
-                "application/json",
-
+              Authorization: `Bearer ${env.OPENROUTER_KEY}`,
+              "Content-Type": "application/json",
+              "HTTP-Referer": "https://autonomouswork.space",
+              "X-Title": "Autonomous Work Space",
             },
-
+            body: JSON.stringify({
+              model,
+              messages: [
+                {
+                  role: "system",
+                  content: systemPrompt,
+                },
+                {
+                  role: "user",
+                  content: userPrompt,
+                },
+              ],
+              temperature: 0.2,
+              max_tokens: 5000,
+            }),
           }
         );
 
+        const responseText = await response.text();
+
+        if (!response.ok) {
+          return {
+            success: false,
+            reason: `HTTP ${response.status}`,
+            details: responseText.slice(0, 1000),
+          };
+        }
+
+        let data;
+
+        try {
+          data = JSON.parse(responseText);
+        } catch {
+          return {
+            success: false,
+            reason: "OpenRouter returned invalid JSON.",
+            details: responseText.slice(0, 1000),
+          };
+        }
+
+        /*
+         * Normal OpenRouter response.
+         */
+
+        let content =
+          data?.choices?.[0]?.message?.content;
+
+        /*
+         * Some model/provider combinations can return content
+         * as an array of content blocks.
+         */
+
+        if (Array.isArray(content)) {
+          content = content
+            .map((part) => {
+              if (typeof part === "string") {
+                return part;
+              }
+
+              if (part && typeof part.text === "string") {
+                return part.text;
+              }
+
+              return "";
+            })
+            .join("");
+        }
+
+        content = String(content || "").trim();
+
+        if (!content) {
+          return {
+            success: false,
+            reason: "Model returned empty content.",
+            details: JSON.stringify(data).slice(0, 1500),
+          };
+        }
+
+        return {
+          success: true,
+          content,
+        };
       }
 
+      /*
+       * ============================================================
+       * TRY FREE MODELS
+       * ============================================================
+       */
+
+      let successfulContent = "";
+      let successfulModel = "";
+      let attempts = 0;
+      const failures = [];
+
+      for (const model of uniqueModels.slice(
+        0,
+        MAX_MODEL_ATTEMPTS
+      )) {
+        attempts++;
+
+        const result = await callModel(model);
+
+        if (result.success) {
+          successfulContent = result.content;
+          successfulModel = model;
+          break;
+        }
+
+        failures.push({
+          model,
+          reason: result.reason,
+        });
+      }
 
       /*
-      ==========================================================
-      READ MODEL RESPONSE
-      ==========================================================
-      */
+       * ============================================================
+       * ALL FREE MODELS FAILED
+       * ============================================================
+       */
 
-      const llmData =
-        await openrouterResponse.json();
-
-
-      const content =
-        llmData
-          ?.choices?.[0]
-          ?.message
-          ?.content ||
-        "";
-
-
-      if (!content) {
-
+      if (!successfulContent) {
         return new Response(
           JSON.stringify({
-
             error:
-              "The reasoning model returned an empty response.",
-
+              "All available free reasoning models failed to return a usable response.",
+            attempts,
+            models_tried: uniqueModels.slice(
+              0,
+              MAX_MODEL_ATTEMPTS
+            ),
+            failures,
           }),
           {
-
-            status:
-              502,
-
+            status: 502,
             headers: {
-
               ...corsHeaders,
-
-              "Content-Type":
-                "application/json",
-
+              "Content-Type": "application/json",
             },
-
           }
         );
-
       }
 
-
       /*
-      ==========================================================
-      CLEAN RESPONSE
-      ==========================================================
-      */
-
-      let cleaned =
-        content
-          .trim()
-          .replace(
-            /^```json/i,
-            ""
-          )
-          .replace(
-            /^```/,
-            ""
-          )
-          .replace(
-            /```$/,
-            ""
-          )
-          .trim();
-
-
-      /*
-      ==========================================================
-      PARSE JSON
-      ==========================================================
-      */
+       * ============================================================
+       * PARSE ARCHITECTURE JSON
+       * ============================================================
+       */
 
       let architecture;
 
-
       try {
-
-        architecture =
-          JSON.parse(
-            cleaned
-          );
-
+        architecture = JSON.parse(successfulContent);
       } catch {
+        /*
+         * Try extracting JSON if the model surrounded it with
+         * accidental text or markdown.
+         */
 
-        const start =
-          cleaned.indexOf(
-            "{"
-          );
-
-
-        const end =
-          cleaned.lastIndexOf(
-            "}"
-          );
-
+        const start = successfulContent.indexOf("{");
+        const end = successfulContent.lastIndexOf("}");
 
         if (
           start === -1 ||
           end === -1 ||
           end <= start
         ) {
-
           return new Response(
             JSON.stringify({
-
               error:
-                "The reasoning model did not return valid JSON.",
-
-              raw:
-                cleaned.slice(
-                  0,
-                  2000
-                ),
-
+                "The reasoning model returned content, but it was not valid JSON.",
+              model: successfulModel,
+              raw: successfulContent.slice(0, 2000),
             }),
             {
-
-              status:
-                502,
-
+              status: 502,
               headers: {
-
                 ...corsHeaders,
-
-                "Content-Type":
-                  "application/json",
-
+                "Content-Type": "application/json",
               },
-
             }
           );
-
         }
-
 
         try {
-
-          architecture =
-            JSON.parse(
-              cleaned.slice(
-                start,
-                end + 1
-              )
-            );
-
+          architecture = JSON.parse(
+            successfulContent.slice(
+              start,
+              end + 1
+            )
+          );
         } catch {
-
           return new Response(
             JSON.stringify({
-
               error:
                 "Could not parse the reasoning model response.",
-
-              raw:
-                cleaned.slice(
-                  0,
-                  2000
-                ),
-
+              model: successfulModel,
+              raw: successfulContent.slice(0, 2000),
             }),
             {
-
-              status:
-                502,
-
+              status: 502,
               headers: {
-
                 ...corsHeaders,
-
-                "Content-Type":
-                  "application/json",
-
+                "Content-Type": "application/json",
               },
-
             }
           );
-
         }
-
       }
 
-
       /*
-      ==========================================================
-      VALIDATE BASIC STRUCTURE
-      ==========================================================
-      */
-
-      if (
-        !architecture ||
-        typeof architecture !== "object"
-      ) {
-
-        return new Response(
-          JSON.stringify({
-
-            error:
-              "The model returned an invalid architecture.",
-
-          }),
-          {
-
-            status:
-              502,
-
-            headers: {
-
-              ...corsHeaders,
-
-              "Content-Type":
-                "application/json",
-
-            },
-
-          }
-        );
-
-      }
-
-
-      /*
-      ==========================================================
-      RETURN SUCCESS
-      ==========================================================
-      */
+       * ============================================================
+       * RETURN FINAL ARCHITECTURE
+       * ============================================================
+       */
 
       return new Response(
         JSON.stringify({
-
-          success:
-            true,
-
+          success: true,
           architecture,
-
+          model_used: successfulModel,
+          model_attempts: attempts,
         }),
         {
-
           headers: {
-
             ...corsHeaders,
-
-            "Content-Type":
-              "application/json",
-
-            "Cache-Control":
-              "no-store",
-
+            "Content-Type": "application/json",
           },
-
         }
       );
-
-
     } catch (error) {
-
-
-      const message =
-        error?.name === "AbortError"
-          ? "The workspace architecture request timed out. Please try again."
-          : (
-              error.message ||
-              "Unexpected Worker error."
-            );
-
-
       return new Response(
         JSON.stringify({
-
           error:
-            message,
-
+            error?.message ||
+            "Unexpected Worker error.",
         }),
         {
-
-          status:
-            500,
-
+          status: 500,
           headers: {
-
             ...corsHeaders,
-
-            "Content-Type":
-              "application/json",
-
+            "Content-Type": "application/json",
           },
-
         }
       );
-
     }
-
-  }
-
+  },
 };
