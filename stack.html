@@ -1833,72 +1833,32 @@ if (buildButton) {
 
 /*
 ==========================================================
-EXAMPLE GOALS
-==========================================================
-*/
-
-const exampleGoals = {
-
-  research:
-    `Build an autonomous research workspace that discovers reliable information, analyzes multiple sources, organizes findings, remembers important context, and produces structured research reports.`,
-
-  content:
-    `Build an autonomous content workspace that researches topics, creates long-form articles, generates social media content, organizes drafts, and continuously improves content quality.`,
-
-  coding:
-    `Build a coding workspace that analyzes software requirements, writes code, runs tests, detects problems, and continuously improves the implementation.`,
-
-  marketing:
-    `Build an autonomous marketing workspace that researches audiences, creates campaigns, generates content, analyzes performance, and continuously improves marketing results.`
-
-};
-
-
-/*
-==========================================================
 EXAMPLE BUTTONS
 ==========================================================
 */
 
 document
-  .querySelectorAll(
-    "[data-example]"
-  )
+  .querySelectorAll("[data-example]")
   .forEach(
     button => {
-
       button.addEventListener(
         "click",
         () => {
+          const example =
+            button.dataset.example || "";
 
-          const key =
-            button.dataset.example;
-
-
-          if (
-            exampleGoals[key] &&
-            goalInput
-          ) {
-
-            goalInput.value =
-              exampleGoals[key];
-
-
-            goalInput.focus();
-
-
-            goalInput.scrollIntoView({
-              behavior:
-                "smooth",
-              block:
-                "center"
-            });
-
+          if (!example || !goalInput) {
+            return;
           }
 
+          goalInput.value = example;
+          goalInput.focus();
+          goalInput.scrollIntoView({
+            behavior: "smooth",
+            block: "center"
+          });
         }
       );
-
     }
   );
 
