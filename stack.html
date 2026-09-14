@@ -1,1235 +1,937 @@
 <!DOCTYPE html>
-
 <html lang="en">
-
 <head>
-
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0"
-  />
+  <title>Autonomous Stack Builder — Autonomous Work Space</title>
 
-  <meta
-    name="description"
-    content="Build an autonomous AI work stack using agents, tools, automation, memory and infrastructure."
-  />
+  <link rel="stylesheet" href="style.css" />
 
-  <title>
-    Autonomous Work Stack | Autonomous Work Space
-  </title>
+  <style>
+    .stack-builder-v3 {
+      max-width: 980px;
+      margin: 0 auto;
+    }
 
-  <link
-    rel="stylesheet"
-    href="style.css"
-  />
+    .stack-goal-box {
+      margin-top: 30px;
+      padding: 28px;
+      border: 1px solid rgba(70, 179, 255, 0.18);
+      border-radius: 18px;
+      background: rgba(70, 179, 255, 0.035);
+    }
 
+    .stack-goal-label {
+      display: block;
+      margin-bottom: 12px;
+      color: var(--blue);
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    #stack-goal {
+      width: 100%;
+      min-height: 150px;
+      resize: vertical;
+      padding: 18px;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 12px;
+      background: rgba(0,0,0,0.25);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.98rem;
+      line-height: 1.6;
+      outline: none;
+    }
+
+    #stack-goal:focus {
+      border-color: rgba(70, 179, 255, 0.5);
+    }
+
+    .goal-examples {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .goal-example {
+      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(255,255,255,0.025);
+      color: var(--muted);
+      padding: 9px 13px;
+      border-radius: 999px;
+      cursor: pointer;
+      font: inherit;
+      font-size: 0.78rem;
+      transition: 0.2s ease;
+    }
+
+    .goal-example:hover {
+      color: var(--text);
+      border-color: rgba(70, 179, 255, 0.35);
+    }
+
+    .stack-build-action {
+      margin-top: 24px;
+    }
+
+    .builder-status {
+      margin-top: 20px;
+      min-height: 24px;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
+    .builder-status.active {
+      color: var(--blue);
+    }
+
+    .builder-status.error {
+      color: #ff8b8b;
+    }
+
+    .builder-analysis {
+      margin-top: 35px;
+    }
+
+    .analysis-box {
+      padding: 24px;
+      border: 1px solid rgba(70,179,255,0.14);
+      border-radius: 16px;
+      background: rgba(70,179,255,0.025);
+    }
+
+    .analysis-label {
+      color: var(--blue);
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.13em;
+      text-transform: uppercase;
+    }
+
+    .analysis-summary {
+      margin-top: 10px;
+      color: var(--text);
+      line-height: 1.65;
+    }
+
+    .capability-list {
+      display: grid;
+      gap: 12px;
+      margin-top: 20px;
+    }
+
+    .capability-item {
+      padding: 15px 17px;
+      border-left: 2px solid rgba(70,179,255,0.45);
+      background: rgba(255,255,255,0.025);
+      border-radius: 0 10px 10px 0;
+    }
+
+    .capability-item strong {
+      display: block;
+      font-size: 0.88rem;
+    }
+
+    .capability-item span {
+      display: block;
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 0.8rem;
+      line-height: 1.5;
+    }
+
+    .generated-stack-v3 {
+      display: grid;
+      gap: 18px;
+      margin-top: 30px;
+    }
+
+    .generated-layer {
+      padding: 25px;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 16px;
+      background: rgba(255,255,255,0.025);
+    }
+
+    .generated-layer-number {
+      color: var(--blue);
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.13em;
+    }
+
+    .generated-layer h3 {
+      margin-top: 7px;
+      margin-bottom: 9px;
+      font-size: 1.15rem;
+    }
+
+    .layer-purpose {
+      color: var(--muted);
+      font-size: 0.86rem;
+      line-height: 1.6;
+    }
+
+    .layer-why {
+      margin-top: 16px;
+      padding: 15px 17px;
+      border-radius: 10px;
+      background: rgba(70,179,255,0.04);
+      color: var(--muted);
+      font-size: 0.82rem;
+      line-height: 1.6;
+    }
+
+    .layer-why strong {
+      color: var(--text);
+    }
+
+    .component-group {
+      margin-top: 22px;
+    }
+
+    .component-group-title {
+      margin-bottom: 10px;
+      color: var(--blue);
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .component {
+      margin-top: 9px;
+      padding: 14px 16px;
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 10px;
+      background: rgba(0,0,0,0.16);
+    }
+
+    .component-name {
+      font-size: 0.88rem;
+      font-weight: 700;
+    }
+
+    .component-type {
+      margin-left: 7px;
+      color: var(--muted);
+      font-size: 0.68rem;
+    }
+
+    .component-reason {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 0.8rem;
+      line-height: 1.55;
+    }
+
+    .component-link {
+      display: inline-block;
+      margin-top: 8px;
+      color: var(--blue);
+      font-size: 0.72rem;
+      text-decoration: none;
+    }
+
+    .component-link:hover {
+      text-decoration: underline;
+    }
+
+    .gap-box {
+      margin-top: 25px;
+      padding: 22px;
+      border: 1px solid rgba(255,180,70,0.22);
+      border-radius: 14px;
+      background: rgba(255,180,70,0.035);
+    }
+
+    .gap-box h3 {
+      margin-bottom: 12px;
+      color: #ffbd68;
+      font-size: 0.95rem;
+    }
+
+    .gap-item {
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 0.82rem;
+      line-height: 1.55;
+    }
+
+    .gap-item strong {
+      color: var(--text);
+    }
+
+    .architecture-summary {
+      margin-top: 25px;
+      padding: 23px;
+      border-radius: 14px;
+      background: rgba(70,179,255,0.035);
+      border: 1px solid rgba(70,179,255,0.14);
+    }
+
+    .architecture-summary span {
+      color: var(--blue);
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .architecture-summary p {
+      margin-top: 9px;
+      color: var(--muted);
+      line-height: 1.65;
+      font-size: 0.86rem;
+    }
+
+    .empty-builder {
+      padding: 25px;
+      border: 1px dashed rgba(255,255,255,0.1);
+      border-radius: 14px;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
+    .builder-note {
+      margin-top: 20px;
+      color: var(--muted);
+      font-size: 0.74rem;
+      line-height: 1.6;
+    }
+
+    @media (max-width: 700px) {
+      .stack-goal-box {
+        padding: 20px;
+      }
+
+      .generated-layer {
+        padding: 20px;
+      }
+    }
+  </style>
 </head>
-
 
 <body>
 
-
-  <!-- BACKGROUND -->
-
-  <div class="background-glow glow-one"></div>
-
-  <div class="background-glow glow-two"></div>
-
-
-  <!-- NAVIGATION -->
-
-  <nav class="navbar">
-
-    <div class="nav-container">
-
-
-      <a
-        href="index.html"
-        class="brand"
-      >
-
-        <span class="brand-icon">
-          ◉
-        </span>
-
-        <span>
-          Autonomous
-          <strong>
-            Work Space
-          </strong>
-        </span>
-
+  <header class="site-header">
+    <div class="container nav-wrap">
+      <a href="index.html" class="brand">
+        <span class="brand-mark">◉</span>
+        Autonomous Work Space
       </a>
 
-
-      <div class="nav-links">
-
-        <a href="index.html">
-          Home
-        </a>
-
-        <a href="agents.html">
-          Agents
-        </a>
-
-        <a href="tools.html">
-          Tools
-        </a>
-
-        <a
-          href="stack.html"
-          class="active"
-        >
-          Stack
-        </a>
-
-        <a href="workflows.html">
-          Workflows
-        </a>
-
-      </div>
-
-
+      <nav class="nav">
+        <a href="index.html">Home</a>
+        <a href="agents.html">Agents</a>
+        <a href="tools.html">Tools</a>
+        <a href="stack.html" class="active">Stack</a>
+        <a href="workflows.html">Workflows</a>
+      </nav>
     </div>
-
-  </nav>
-
+  </header>
 
 
   <main>
 
+    <!-- =====================================================
+         HERO
+         ===================================================== -->
 
-    <!-- HERO -->
+    <section class="hero">
+      <div class="container">
 
-    <section class="page-hero section">
+        <div class="hero-label">
+          01 — THE AUTONOMOUS WORK STACK
+        </div>
 
+        <h1>
+          Build an Autonomous Stack.
+        </h1>
 
-      <div class="section-label">
-        01 — THE AUTONOMOUS WORK STACK
-      </div>
+        <p class="hero-description">
+          Give the workspace a real objective. The builder analyzes what
+          the work requires, designs an appropriate architecture, and
+          selects available agents and tools from the live ecosystem.
+        </p>
 
-
-      <h1>
-
-        Build an
-
-        <span>
-          Autonomous Stack.
-        </span>
-
-      </h1>
-
-
-      <p class="page-hero-description">
-
-        An autonomous workspace is more than a collection
-        of AI tools. It is a connected system of intelligence,
-        agents, automation, memory and infrastructure.
-
-      </p>
-
-
-      <div class="hero-buttons">
-
-
-        <a
-          href="#stack-builder"
-          class="button button-primary"
-        >
-
-          Build My Stack
-
-          <span>
-            →
-          </span>
-
-        </a>
-
-
-        <a
-          href="agents.html"
-          class="button button-secondary"
-        >
-
-          Explore Agents
-
-        </a>
-
+        <div class="hero-buttons">
+          <a href="agents.html" class="button button-secondary">
+            Explore Agents
+          </a>
+        </div>
 
       </div>
-
-
     </section>
 
 
+    <!-- =====================================================
+         STATIC EXPLANATION
+         ===================================================== -->
 
-    <!-- ARCHITECTURE -->
+    <section class="section">
+      <div class="container">
 
-    <section class="section stack-section">
+        <div class="section-header">
+          <span>02 — HOW IT THINKS</span>
+          <h2>
+            From a goal to a workspace.
+          </h2>
+        </div>
 
+        <div class="explore-grid">
 
-      <div class="section-label">
-        02 — THE ARCHITECTURE
-      </div>
-
-
-      <h2>
-
-        The Seven Layers of
-
-        <span>
-          Autonomous Work.
-        </span>
-
-      </h2>
-
-
-      <p class="stack-intro">
-
-        These layers represent the major building blocks
-        commonly found in autonomous systems. A generated
-        workspace does not need to use every layer.
-
-      </p>
-
-
-
-      <div class="stack-container">
-
-
-        <!-- INTELLIGENCE -->
-
-        <div class="stack-item">
-
-          <div class="stack-number">
-            01
-          </div>
-
-          <div class="stack-icon">
-            🧠
-          </div>
-
-          <div class="stack-content">
-
-            <h3>
-              Intelligence
-            </h3>
-
+          <div class="explore-card">
+            <span class="card-number">01</span>
+            <h3>Understand</h3>
             <p>
-              Models and reasoning systems that provide intelligence.
+              The system examines what the user is actually trying to
+              accomplish instead of assuming a predefined workspace structure.
             </p>
+          </div>
 
+          <div class="explore-card">
+            <span class="card-number">02</span>
+            <h3>Architect</h3>
+            <p>
+              It determines the capabilities and work stages required to
+              accomplish the goal.
+            </p>
+          </div>
+
+          <div class="explore-card">
+            <span class="card-number">03</span>
+            <h3>Compose</h3>
+            <p>
+              It searches the current Autonomous Work Space ecosystem and
+              selects the most relevant available agents and tools.
+            </p>
           </div>
 
         </div>
-
-
-        <div class="stack-line"></div>
-
-
-        <!-- AGENTS -->
-
-        <div class="stack-item">
-
-          <div class="stack-number">
-            02
-          </div>
-
-          <div class="stack-icon">
-            🤖
-          </div>
-
-          <div class="stack-content">
-
-            <h3>
-              Agents
-            </h3>
-
-            <p>
-              Systems capable of performing meaningful work.
-            </p>
-
-          </div>
-
-        </div>
-
-
-        <div class="stack-line"></div>
-
-
-        <!-- ORCHESTRATION -->
-
-        <div class="stack-item">
-
-          <div class="stack-number">
-            03
-          </div>
-
-          <div class="stack-icon">
-            ◉
-          </div>
-
-          <div class="stack-content">
-
-            <h3>
-              Orchestration
-            </h3>
-
-            <p>
-              Coordinates agents, tasks and decisions.
-            </p>
-
-          </div>
-
-        </div>
-
-
-        <div class="stack-line"></div>
-
-
-        <!-- AUTOMATION -->
-
-        <div class="stack-item">
-
-          <div class="stack-number">
-            04
-          </div>
-
-          <div class="stack-icon">
-            ⚡
-          </div>
-
-          <div class="stack-content">
-
-            <h3>
-              Automation
-            </h3>
-
-            <p>
-              Triggers actions and keeps processes moving.
-            </p>
-
-          </div>
-
-        </div>
-
-
-        <div class="stack-line"></div>
-
-
-        <!-- TOOLS -->
-
-        <div class="stack-item">
-
-          <div class="stack-number">
-            05
-          </div>
-
-          <div class="stack-icon">
-            🔌
-          </div>
-
-          <div class="stack-content">
-
-            <h3>
-              Tools
-            </h3>
-
-            <p>
-              External capabilities available to agents.
-            </p>
-
-          </div>
-
-        </div>
-
-
-        <div class="stack-line"></div>
-
-
-        <!-- MEMORY -->
-
-        <div class="stack-item">
-
-          <div class="stack-number">
-            06
-          </div>
-
-          <div class="stack-icon">
-            ◈
-          </div>
-
-          <div class="stack-content">
-
-            <h3>
-              Memory
-            </h3>
-
-            <p>
-              Knowledge, context and persistent information.
-            </p>
-
-          </div>
-
-        </div>
-
-
-        <div class="stack-line"></div>
-
-
-        <!-- INFRASTRUCTURE -->
-
-        <div class="stack-item">
-
-          <div class="stack-number">
-            07
-          </div>
-
-          <div class="stack-icon">
-            ☁
-          </div>
-
-          <div class="stack-content">
-
-            <h3>
-              Infrastructure
-            </h3>
-
-            <p>
-              The systems that allow everything to operate.
-            </p>
-
-          </div>
-
-        </div>
-
 
       </div>
-
-
     </section>
 
 
+    <!-- =====================================================
+         BUILDER
+         ===================================================== -->
 
-    <!-- AUTONOMOUS BUILDER -->
+    <section class="section">
+      <div class="container stack-builder-v3">
 
-    <section
-      id="stack-builder"
-      class="section builder-section"
-    >
-
-
-      <div class="section-label">
-        03 — AUTONOMOUS STACK BUILDER V3
-      </div>
-
-
-      <div class="builder-header">
-
-
-        <div>
+        <div class="section-header">
+          <span>03 — AUTONOMOUS STACK BUILDER V3</span>
 
           <h2>
-
-            Let the Workspace
-
-            <span>
-              Build the Stack.
-            </span>
-
-          </h2>
-
-
-          <p>
-
             Tell the workspace what you want to build.
-            The builder analyzes your goal, evaluates the
-            agents and tools available in the directory,
-            detects capability gaps and refines the architecture.
+          </h2>
 
+          <p>
+            The builder now uses an LLM to reason about your goal and the
+            actual agents and tools currently available in the directory.
           </p>
-
-
         </div>
 
 
-      </div>
+        <div class="stack-goal-box">
+
+          <label
+            class="stack-goal-label"
+            for="stack-goal"
+          >
+            What do you want your autonomous workspace to do?
+          </label>
+
+          <textarea
+            id="stack-goal"
+            placeholder="Describe the complete outcome you want the workspace to achieve..."
+          ></textarea>
+
+
+          <div class="goal-examples">
+
+            <button
+              class="goal-example"
+              data-example="Build a research workspace that continuously discovers emerging AI technologies, evaluates their usefulness, compares them with existing solutions, and produces concise research reports."
+            >
+              Research Workspace
+            </button>
+
+            <button
+              class="goal-example"
+              data-example="Build an automated content system that researches topics, identifies search opportunities, creates useful articles, publishes them, and monitors their performance."
+            >
+              Content System
+            </button>
+
+            <button
+              class="goal-example"
+              data-example="Build a coding workspace that analyzes software requirements, writes code, runs tests, detects problems, and continuously improves the implementation."
+            >
+              Coding Workspace
+            </button>
+
+            <button
+              class="goal-example"
+              data-example="Build an automated marketing system that discovers prospects, researches them, creates personalized outreach, tracks responses, and reports campaign performance."
+            >
+              Marketing System
+            </button>
 
-
-
-      <!-- GOAL INPUT -->
-
-      <div class="workspace-input-area">
-
-
-        <label
-          for="workspace-goal"
-          class="workspace-label"
-        >
-
-          What do you want your autonomous workspace to do?
-
-        </label>
-
-
-        <textarea
-          id="workspace-goal"
-          class="workspace-goal-input"
-          placeholder="Describe what you want to build..."
-          rows="6"
-        ></textarea>
-
-
-      </div>
-
-
-
-      <!-- PRESET EXAMPLES -->
-
-      <div class="goal-examples">
-
-
-        <button
-          type="button"
-          class="goal-example"
-          data-goal="Build a research workspace that discovers information, analyzes sources, compares findings, remembers context and produces useful reports."
-        >
-
-          Research Workspace
-
-        </button>
-
-
-        <button
-          type="button"
-          class="goal-example"
-          data-goal="Build an autonomous content system that researches topics, creates articles and social content, organizes files and continuously improves the content."
-        >
-
-          Content System
-
-        </button>
-
-
-        <button
-          type="button"
-          class="goal-example"
-          data-goal="Build a coding workspace that analyzes software requirements, writes code, runs tests, detects problems, and continuously improves the implementation."
-        >
-
-          Coding Workspace
-
-        </button>
-
-
-        <button
-          type="button"
-          class="goal-example"
-          data-goal="Build a marketing system that researches audiences, creates campaigns, monitors results, automates repetitive work and continuously improves performance."
-        >
-
-          Marketing System
-
-        </button>
-
-
-      </div>
-
-
-
-      <!-- BUILD BUTTON -->
-
-      <div class="builder-action">
-
-
-        <button
-          id="build-stack"
-          class="button button-primary"
-          type="button"
-        >
-
-          Build My Stack
-
-          <span>
-            →
-          </span>
-
-        </button>
-
-
-      </div>
-
-
-
-      <!-- STATUS -->
-
-      <div
-        id="stack-status"
-        class="builder-status"
-        aria-live="polite"
-      >
-
-        Loading the current ecosystem...
-
-      </div>
-
-
-
-      <!-- BUILD PROGRESS -->
-
-      <div
-        id="build-progress"
-        class="build-progress"
-        style="display: none;"
-      >
-
-
-        <div
-          class="progress-step"
-          id="progress-understand"
-        >
-
-          <span class="progress-icon">
-            ◉
-          </span>
-
-          <span>
-            Understanding your workspace goal...
-          </span>
-
-        </div>
-
-
-        <div
-          class="progress-step"
-          id="progress-catalog"
-        >
-
-          <span class="progress-icon">
-            ◉
-          </span>
-
-          <span>
-            Analyzing available agents and tools...
-          </span>
-
-        </div>
-
-
-        <div
-          class="progress-step"
-          id="progress-architecture"
-        >
-
-          <span class="progress-icon">
-            ◉
-          </span>
-
-          <span>
-            Designing the initial architecture...
-          </span>
-
-        </div>
-
-
-        <div
-          class="progress-step"
-          id="progress-gaps"
-        >
-
-          <span class="progress-icon">
-            ◉
-          </span>
-
-          <span>
-            Evaluating capability gaps and weak matches...
-          </span>
-
-        </div>
-
-
-        <div
-          class="progress-step"
-          id="progress-research"
-        >
-
-          <span class="progress-icon">
-            ◉
-          </span>
-
-          <span>
-            Researching stronger capability options...
-          </span>
-
-        </div>
-
-
-        <div
-          class="progress-step"
-          id="progress-review"
-        >
-
-          <span class="progress-icon">
-            ◉
-          </span>
-
-          <span>
-            Reviewing and refining the architecture...
-          </span>
-
-        </div>
-
-
-      </div>
-
-
-
-      <!-- GENERATED RESULT -->
-
-      <div
-        id="generated-stack"
-        class="generated-stack"
-      ></div>
-
-
-    </section>
-
-
-
-    <!-- FUTURE DIRECTION -->
-
-    <section class="section workflow-box-section">
-
-
-      <div class="workflow-box">
-
-
-        <div class="workflow-content">
-
-
-          <div class="section-label">
-            04 — THE NEXT STEP
           </div>
 
 
+          <div class="stack-build-action">
+            <button
+              class="button button-primary"
+              id="build-stack"
+            >
+              Build My Stack <span>→</span>
+            </button>
+          </div>
+
+
+          <div
+            id="stack-status"
+            class="builder-status"
+            aria-live="polite"
+          ></div>
+
+        </div>
+
+
+        <!-- =================================================
+             ANALYSIS
+             ================================================= -->
+
+        <div
+          id="builder-analysis"
+          class="builder-analysis"
+        ></div>
+
+
+        <!-- =================================================
+             GENERATED ARCHITECTURE
+             ================================================= -->
+
+        <div
+          id="generated-stack"
+          class="generated-stack-v3"
+        ></div>
+
+        <p class="builder-note">
+          The workspace starts with the live directory, evaluates whether the
+          available ecosystem can satisfy the goal, and reports or researches
+          unresolved capability gaps rather than pretending a weak match is sufficient.
+        </p>
+
+      </div>
+    </section>
+
+
+    <!-- =====================================================
+         FUTURE
+         ===================================================== -->
+
+    <section class="section">
+      <div class="container">
+
+        <div class="section-header">
+          <span>04 — NEXT EVOLUTION</span>
+
           <h2>
-
-            From a Stack
-
-            <span>
-              to Autonomous Work.
-            </span>
-
+            From stack to autonomous workspace.
           </h2>
 
-
           <p>
-
-            A stack defines the capabilities available to
-            a workspace. The next step is connecting those
-            capabilities into workflows that can coordinate
-            tasks, decisions and autonomous execution.
-
+            The stack describes what the workspace needs. The next stage
+            will determine how those capabilities should work together.
           </p>
+        </div>
 
+        <div class="workflow-box">
+
+          <div>
+            <span class="card-number">NEXT</span>
+
+            <h3>
+              Autonomous Workflow Builder
+            </h3>
+
+            <p>
+              Turn the generated architecture into an executable sequence
+              of work, connecting agents, tools, inputs, outputs and
+              evaluation steps.
+            </p>
+          </div>
 
           <a
             href="workflows.html"
-            class="button button-primary"
+            class="button button-secondary"
           >
-
-            Explore Workflows
-
-            <span>
-              →
-            </span>
-
+            Explore Workflows →
           </a>
-
 
         </div>
 
-
       </div>
-
-
     </section>
-
 
   </main>
 
 
-
-  <!-- FOOTER -->
-
-  <footer>
-
-
-    <div class="footer-brand">
-
-      <span class="brand-icon">
-        ◉
-      </span>
-
+  <footer class="site-footer">
+    <div class="container">
       Autonomous Work Space
-
     </div>
-
-
-    <p>
-      Exploring the future of autonomous work.
-    </p>
-
-
   </footer>
 
+     <script>
 
+const WORKER_URL =
+  "https://raspy-brook-525d.superagentic.workers.dev/";
 
-  <script>
+let ecosystem = [];
+let isBuilding = false;
 
 
-    /*
-    =========================================================
-    CONFIGURATION
-    =========================================================
-    */
+/*
+==========================================================
+ELEMENTS
+==========================================================
+*/
 
+const goalInput =
+  document.getElementById("stack-goal");
 
-    const WORKER_URL =
-      "https://raspy-brook-525d.superagentic.workers.dev";
+const buildButton =
+  document.getElementById("build-stack");
 
+const statusEl =
+  document.getElementById("stack-status");
 
-    let ecosystem = [];
+const outputEl =
+  document.getElementById("generated-stack");
 
-    let isBuilding = false;
 
+/*
+==========================================================
+LOAD ECOSYSTEM
+==========================================================
+*/
 
+async function loadEcosystem() {
 
-    /*
-    =========================================================
-    LOAD AIRTABLE ECOSYSTEM
-    =========================================================
-    */
+  try {
 
+    statusEl.textContent =
+      "Loading the autonomous ecosystem...";
 
-    async function loadEcosystem() {
 
-
-      const status =
-        document.getElementById("stack-status");
-
-
-      status.textContent =
-        "Loading the current autonomous ecosystem...";
-
-
-      try {
-
-
-        const response =
-          await fetch(WORKER_URL + "/");
-
-
-        if (!response.ok) {
-
-          throw new Error(
-            "Unable to load ecosystem."
-          );
-
-        }
-
-
-        const data =
-          await response.json();
-
-
-        ecosystem =
-          Array.isArray(data)
-            ? data
-            : [];
-
-
-        if (!ecosystem.length) {
-
-          status.textContent =
-            "The ecosystem is currently empty.";
-
-          return;
-
-        }
-
-
-        status.textContent =
-          `${ecosystem.length} agents and tools are available for architecture building.`;
-
-
-      } catch (error) {
-
-
-        console.error(error);
-
-
-        ecosystem = [];
-
-
-        status.textContent =
-          "Unable to load the autonomous ecosystem right now.";
-
-
-      }
-
-
-    }
-
-
-
-    /*
-    =========================================================
-    PRESET GOALS
-    =========================================================
-    */
-
-
-    document
-      .querySelectorAll(".goal-example")
-      .forEach(button => {
-
-
-        button.addEventListener(
-          "click",
-          () => {
-
-
-            const goal =
-              button.dataset.goal;
-
-
-            const input =
-              document.getElementById(
-                "workspace-goal"
-              );
-
-
-            input.value =
-              goal;
-
-
-            input.focus();
-
-
-            input.scrollIntoView({
-              behavior: "smooth",
-              block: "center"
-            });
-
-
-          }
-        );
-
-
-      });
-
-
-
-    /*
-    =========================================================
-    PROGRESS HELPERS
-    =========================================================
-    */
-
-
-    function resetProgress() {
-
-
-      const steps =
-        document.querySelectorAll(
-          ".progress-step"
-        );
-
-
-      steps.forEach(step => {
-
-
-        step.classList.remove(
-          "active",
-          "complete"
-        );
-
-
-      });
-
-
-    }
-
-
-
-    function setProgress(
-      stepId
-    ) {
-
-
-      const progress =
-        document.getElementById(
-          "build-progress"
-        );
-
-
-      progress.style.display =
-        "block";
-
-
-      const steps = [
-
-        "progress-understand",
-
-        "progress-catalog",
-
-        "progress-architecture",
-
-        "progress-gaps",
-
-        "progress-research",
-
-        "progress-review"
-
-      ];
-
-
-      const currentIndex =
-        steps.indexOf(stepId);
-
-
-      steps.forEach(
-        (id, index) => {
-
-
-          const element =
-            document.getElementById(id);
-
-
-          if (!element) {
-            return;
-          }
-
-
-          element.classList.remove(
-            "active",
-            "complete"
-          );
-
-
-          if (index < currentIndex) {
-
-            element.classList.add(
-              "complete"
-            );
-
-          }
-
-
-          if (index === currentIndex) {
-
-            element.classList.add(
-              "active"
-            );
-
-          }
-
-
+    const response =
+      await fetch(
+        WORKER_URL,
+        {
+          cache: "no-store"
         }
       );
 
 
+    if (!response.ok) {
+      throw new Error(
+        "Unable to load ecosystem."
+      );
     }
 
 
-
-    function completeProgress() {
-
-
-      const steps =
-        document.querySelectorAll(
-          ".progress-step"
-        );
+    ecosystem =
+      await response.json();
 
 
-      steps.forEach(step => {
-
-
-        step.classList.remove(
-          "active"
-        );
-
-
-        step.classList.add(
-          "complete"
-        );
-
-
-      });
-
-
-    }
-
-
-
-    /*
-    =========================================================
-    SAFE HTML
-    =========================================================
-    */
-
-
-    function escapeHTML(value) {
-
-
-      return String(
-        value || ""
-      )
-
-        .replace(
-          /&/g,
-          "&amp;"
-        )
-
-        .replace(
-          /</g,
-          "&lt;"
-        )
-
-        .replace(
-          />/g,
-          "&gt;"
-        )
-
-        .replace(
-          /"/g,
-          "&quot;"
-        )
-
-        .replace(
-          /'/g,
-          "&#039;"
-        );
-
-
-    }
-
-
-
-    /*
-    =========================================================
-    FIND CATALOG ITEM
-    =========================================================
-    */
-
-
-    function findCatalogItem(
-      name
+    if (
+      !Array.isArray(ecosystem)
     ) {
+      ecosystem = [];
+    }
 
 
-      if (!name) {
-        return null;
-      }
+    statusEl.textContent =
+      ecosystem.length
+        ? `${ecosystem.length} capabilities available in the current ecosystem.`
+        : "No capabilities are currently available.";
 
 
-      const target =
+  } catch (error) {
+
+    console.error(error);
+
+    ecosystem = [];
+
+    statusEl.textContent =
+      "Unable to load the autonomous ecosystem.";
+
+  }
+
+}
+
+
+/*
+==========================================================
+PROGRESS DISPLAY
+==========================================================
+*/
+
+function showProgress(
+  currentStep
+) {
+
+  const steps = [
+
+    "Understanding your workspace goal",
+
+    "Analyzing required capabilities",
+
+    "Studying available agents and tools",
+
+    "Designing the workspace architecture",
+
+    "Evaluating component matches",
+
+    "Reviewing and refining the stack"
+
+  ];
+
+
+  outputEl.innerHTML =
+    `
+      <div class="build-progress">
+
+        ${steps.map(
+          (step, index) => {
+
+            let className =
+              "";
+
+            let icon =
+              "○";
+
+
+            if (
+              index < currentStep
+            ) {
+
+              className =
+                "complete";
+
+              icon =
+                "✓";
+
+            }
+
+
+            if (
+              index === currentStep
+            ) {
+
+              className =
+                "active";
+
+              icon =
+                "◉";
+
+            }
+
+
+            return `
+
+              <div class="progress-step ${className}">
+
+                <span class="progress-icon">
+                  ${icon}
+                </span>
+
+                <span>
+                  ${step}
+                </span>
+
+              </div>
+
+            `;
+
+          }
+        ).join("")}
+
+      </div>
+    `;
+
+}
+
+
+/*
+==========================================================
+ESCAPE HTML
+==========================================================
+*/
+
+function escapeHTML(value) {
+
+  return String(
+    value || ""
+  )
+    .replace(
+      /&/g,
+      "&amp;"
+    )
+    .replace(
+      /</g,
+      "&lt;"
+    )
+    .replace(
+      />/g,
+      "&gt;"
+    )
+    .replace(
+      /"/g,
+      "&quot;"
+    )
+    .replace(
+      /'/g,
+      "&#039;"
+    );
+
+}
+
+
+/*
+==========================================================
+FIND COMPONENT
+==========================================================
+*/
+
+function findComponent(
+  name
+) {
+
+  if (!name) {
+    return null;
+  }
+
+
+  return ecosystem.find(
+    item => {
+
+      const itemName =
+        String(
+          item.Name ||
+          item.name ||
+          ""
+        ).trim().toLowerCase();
+
+
+      return (
+        itemName ===
         String(name)
           .trim()
-          .toLowerCase();
-
-
-      return ecosystem.find(
-        item => {
-
-
-          const itemName =
-            String(
-              item.Name ||
-              item.name ||
-              ""
-            )
-
-              .trim()
-
-              .toLowerCase();
-
-
-          return itemName === target;
-
-
-        }
+          .toLowerCase()
       );
 
-
     }
+  );
+
+}
 
 
+/*
+==========================================================
+RENDER COMPONENT
+==========================================================
+*/
 
-    /*
-    =========================================================
-    RENDER COMPONENT
-    =========================================================
-    */
+function renderComponent(
+  component,
+  componentType
+) {
 
-
-    function renderComponent(
-      component,
-      type
-    ) {
-
-
-      if (!component) {
-        return "";
-      }
+  const item =
+    findComponent(
+      component.name
+    );
 
 
-      const name =
-        component.name ||
-        component.Name ||
-        "Unnamed capability";
+  const url =
+    item
+      ? (
+          item.URL ||
+          item.url ||
+          ""
+        )
+      : "";
 
 
-      const reason =
-        component.reason ||
-        component.why_selected ||
-        "";
+  const category =
+    item
+      ? (
+          item.Category ||
+          item.category ||
+          ""
+        )
+      : "";
 
 
-      const catalogItem =
-        findCatalogItem(name);
+  return `
+
+    <div class="stack-component">
+
+      <div class="stack-component-main">
+
+        <div class="stack-component-type">
+
+          ${escapeHTML(
+            componentType
+          )}
+
+          ${
+            category
+              ? " · " +
+                escapeHTML(category)
+              : ""
+          }
+
+        </div>
 
 
-      const url =
-        catalogItem?.URL ||
-        catalogItem?.url ||
-        component.url ||
-        "";
+        <h4>
+
+          ${escapeHTML(
+            component.name
+          )}
+
+        </h4>
 
 
-      const category =
-        catalogItem?.Category ||
-        catalogItem?.category ||
-        component.category ||
-        "";
+        <p>
+
+          <strong>
+            Why selected:
+          </strong>
+
+          ${escapeHTML(
+            component.reason
+          )}
+
+        </p>
+
+      </div>
 
 
-      const safeName =
-        escapeHTML(name);
-
-
-      const safeReason =
-        escapeHTML(reason);
-
-
-      const safeCategory =
-        escapeHTML(category);
-
-
-      const linkHTML =
+      ${
         url
           ? `
 
@@ -1237,1195 +939,957 @@
               href="${escapeHTML(url)}"
               target="_blank"
               rel="noopener noreferrer"
-              class="capability-link"
+              class="component-link"
             >
-
               Open capability →
-
             </a>
 
           `
-          : "";
+          : ""
+      }
+
+    </div>
+
+  `;
+
+}
 
 
-      return `
+/*
+==========================================================
+RENDER ARCHITECTURE
+==========================================================
+*/
 
-        <div class="generated-item">
+function renderArchitecture(
+  architecture
+) {
 
-
-          <div class="generated-item-main">
-
-
-            <div class="generated-item-title">
-
-              ${safeName}
-
-            </div>
-
-
-            ${safeCategory
-              ? `
-
-                <div class="generated-item-category">
-
-                  ${escapeHTML(type)}
-
-                  ·
-
-                  ${safeCategory}
-
-                </div>
-
-              `
-              : ""
-            }
+  const goalSummary =
+    architecture.goal_summary ||
+    "";
 
 
-            ${safeReason
-              ? `
-
-                <div class="generated-item-reason">
-
-                  <strong>
-                    Why selected:
-                  </strong>
-
-                  ${safeReason}
-
-                </div>
-
-              `
-              : ""
-            }
+  const capabilities =
+    Array.isArray(
+      architecture.core_capabilities
+    )
+      ? architecture.core_capabilities
+      : [];
 
 
-            ${linkHTML}
+  const layers =
+    Array.isArray(
+      architecture.layers
+    )
+      ? architecture.layers
+      : [];
 
+
+  const gaps =
+    Array.isArray(
+      architecture.gaps
+    )
+      ? architecture.gaps
+      : [];
+
+
+  const review =
+    architecture.review ||
+    {};
+
+
+  let html = "";
+
+
+  /*
+  WORKSPACE UNDERSTANDING
+  */
+
+  if (goalSummary) {
+
+    html += `
+
+      <div class="workspace-understanding">
+
+        <h3>
+          Workspace Understanding
+        </h3>
+
+        <p>
+          ${escapeHTML(goalSummary)}
+        </p>
+
+      </div>
+
+    `;
+
+  }
+
+
+  /*
+  REQUIRED CAPABILITIES
+  */
+
+  if (
+    capabilities.length
+  ) {
+
+    html += `
+
+      <div class="required-capabilities">
+
+        <h3>
+          Required Capabilities
+        </h3>
+
+        <div class="capabilities-grid">
+
+    `;
+
+
+    html +=
+      capabilities.map(
+        capability => `
+
+          <div class="capability-item">
+
+            <h4>
+              ${escapeHTML(
+                capability.name
+              )}
+            </h4>
+
+            <p>
+              ${escapeHTML(
+                capability.reason
+              )}
+            </p>
 
           </div>
 
+        `
+      ).join("");
+
+
+    html += `
+
+        </div>
+
+      </div>
+
+    `;
+
+  }
+
+
+  /*
+  LAYERS
+  */
+
+  html += `
+
+    <div class="final-stack">
+
+  `;
+
+
+  layers.forEach(
+    (layer, index) => {
+
+      const agents =
+        Array.isArray(
+          layer.agents
+        )
+          ? layer.agents
+          : [];
+
+
+      const tools =
+        Array.isArray(
+          layer.tools
+        )
+          ? layer.tools
+          : [];
+
+
+      html += `
+
+        <div class="workspace-layer">
+
+          <div class="workspace-layer-number">
+
+            ${String(
+              layer.number ||
+              index + 1
+            ).padStart(
+              2,
+              "0"
+            )}
+
+            — WORKSPACE LAYER
+
+          </div>
+
+
+          <h3>
+
+            ${escapeHTML(
+              layer.name
+            )}
+
+          </h3>
+
+
+          <p class="layer-purpose">
+
+            ${escapeHTML(
+              layer.purpose
+            )}
+
+          </p>
+
+
+          <div class="layer-why">
+
+            <strong>
+              Why this layer exists:
+            </strong>
+
+            ${escapeHTML(
+              layer.why_needed
+            )}
+
+          </div>
+
+      `;
+
+
+      if (
+        agents.length
+      ) {
+
+        html += `
+
+          <div class="component-group">
+
+            <h4>
+              Selected Agents
+            </h4>
+
+        `;
+
+
+        html +=
+          agents.map(
+            agent =>
+              renderComponent(
+                agent,
+                "Agent"
+              )
+          ).join("");
+
+
+        html += `
+
+          </div>
+
+        `;
+
+      }
+
+
+      if (
+        tools.length
+      ) {
+
+        html += `
+
+          <div class="component-group">
+
+            <h4>
+              Selected Tools
+            </h4>
+
+        `;
+
+
+        html +=
+          tools.map(
+            tool =>
+              renderComponent(
+                tool,
+                "Tool"
+              )
+          ).join("");
+
+
+        html += `
+
+          </div>
+
+        `;
+
+      }
+
+
+      html += `
+
+        </div>
+
+      `;
+
+    }
+  );
+
+
+  html += `
+
+    </div>
+
+  `;
+
+
+  /*
+  CAPABILITY GAPS
+  */
+
+  if (
+    gaps.length
+  ) {
+
+    html += `
+
+      <div class="capability-gaps">
+
+        <h3>
+          ⚠ Capability Gaps Detected
+        </h3>
+
+        <div class="gap-list">
+
+    `;
+
+
+    html +=
+      gaps.map(
+        gap => `
+
+          <div class="gap-item">
+
+            <strong>
+              ${escapeHTML(
+                gap.capability
+              )}
+            </strong>
+
+            <p>
+              ${escapeHTML(
+                gap.reason
+              )}
+            </p>
+
+          </div>
+
+        `
+      ).join("");
+
+
+    html += `
+
+        </div>
+
+      </div>
+
+    `;
+
+  }
+
+
+  /*
+  EXTERNAL / STRONGER CAPABILITY RECOMMENDATIONS
+  */
+
+  const recommendations =
+    Array.isArray(
+      architecture.recommendations
+    )
+      ? architecture.recommendations
+      : (
+          Array.isArray(
+            architecture.external_recommendations
+          )
+            ? architecture.external_recommendations
+            : []
+        );
+
+  if (recommendations.length) {
+
+    html += `
+
+      <div class="gap-box">
+
+        <h3>
+          Recommended Capability Options
+        </h3>
+
+        <p class="builder-note" style="margin-top:0;">
+          These options were identified during gap evaluation because the current directory may not fully satisfy part of the goal.
+        </p>
+
+        <div class="gap-list">
+    `;
+
+    html +=
+      recommendations.map(
+        recommendation => {
+
+          const name =
+            recommendation.name ||
+            recommendation.capability ||
+            "Recommended capability";
+
+          const reason =
+            recommendation.reason ||
+            recommendation.why ||
+            "";
+
+          const url =
+            recommendation.url ||
+            recommendation.URL ||
+            "";
+
+          return `
+
+            <div class="gap-item">
+
+              <strong>
+                ${escapeHTML(name)}
+              </strong>
+
+              ${reason
+                ? `<p>${escapeHTML(reason)}</p>`
+                : ""
+              }
+
+              ${url
+                ? `
+                  <a
+                    href="${escapeHTML(url)}"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="component-link"
+                  >
+                    Explore capability →
+                  </a>
+                `
+                : ""
+              }
+
+            </div>
+
+          `;
+        }
+      ).join("");
+
+    html += `
+
+        </div>
+      </div>
+    `;
+  }
+
+
+  /*
+  SELF REVIEW
+  */
+
+  if (
+    review.summary ||
+    (
+      Array.isArray(
+        review.improvements
+      ) &&
+      review.improvements.length
+    )
+  ) {
+
+    html += `
+
+      <div class="architecture-review">
+
+        <h3>
+          Stack Self-Review
+        </h3>
+
+    `;
+
+
+    if (
+      review.summary
+    ) {
+
+      html += `
+
+        <p>
+
+          ${escapeHTML(
+            review.summary
+          )}
+
+        </p>
+
+      `;
+
+    }
+
+
+    if (
+      Array.isArray(
+        review.improvements
+      ) &&
+      review.improvements.length
+    ) {
+
+      html += `
+
+        <ul>
+
+      `;
+
+
+      html +=
+        review.improvements.map(
+          improvement => `
+
+            <li>
+              ${escapeHTML(
+                improvement
+              )}
+            </li>
+
+          `
+        ).join("");
+
+
+      html += `
+
+        </ul>
+
+      `;
+
+    }
+
+
+    html += `
+
+      </div>
+
+    `;
+
+  }
+
+
+  /*
+  ARCHITECTURE LOGIC
+  */
+
+  if (
+    architecture.architecture_summary
+  ) {
+
+    html += `
+
+      <div class="architecture-summary">
+
+        <h3>
+          Architecture Logic
+        </h3>
+
+        <p>
+
+          ${escapeHTML(
+            architecture.architecture_summary
+          )}
+
+        </p>
+
+      </div>
+
+    `;
+
+  }
+
+
+  outputEl.innerHTML =
+    html;
+
+}
+
+
+/*
+==========================================================
+BUILD STACK
+==========================================================
+*/
+
+async function buildStack() {
+
+  if (isBuilding) {
+    return;
+  }
+
+
+  const goal =
+    String(
+      goalInput?.value || ""
+    ).trim();
+
+
+  if (!goal) {
+
+    statusEl.textContent =
+      "Please describe what you want your autonomous workspace to do.";
+
+    goalInput?.focus();
+
+    return;
+
+  }
+
+
+  if (
+    !ecosystem.length
+  ) {
+
+    statusEl.textContent =
+      "The ecosystem is not ready yet. Please wait a moment and try again.";
+
+    return;
+
+  }
+
+
+  isBuilding =
+    true;
+
+
+  buildButton.disabled =
+    true;
+
+
+  buildButton.innerHTML =
+    `
+      Building Workspace
+      <span>◌</span>
+    `;
+
+
+  statusEl.textContent =
+    "Understanding your workspace goal...";
+
+
+  showProgress(0);
+
+
+  /*
+  Progress animation while
+  the Worker processes the request.
+  */
+
+  let progress =
+    0;
+
+
+  const progressTimer =
+    setInterval(
+      () => {
+
+        if (
+          progress < 5
+        ) {
+
+          progress++;
+
+          showProgress(
+            progress
+          );
+
+        }
+
+      },
+      2500
+    );
+
+
+  try {
+
+
+    const response =
+      await fetch(
+        WORKER_URL +
+        "build-stack",
+        {
+
+          method:
+            "POST",
+
+          headers: {
+
+            "Content-Type":
+              "application/json",
+
+          },
+
+          body:
+            JSON.stringify({
+
+              goal,
+
+              ecosystem,
+
+            }),
+
+        }
+      );
+
+
+    let data;
+
+
+    try {
+
+      data =
+        await response.json();
+
+    } catch {
+
+      throw new Error(
+        "The Worker returned an unreadable response."
+      );
+
+    }
+
+
+    if (
+      !response.ok ||
+      !data.success
+    ) {
+
+      throw new Error(
+        data.error ||
+        "The workspace could not be built."
+      );
+
+    }
+
+
+    if (
+      !data.architecture
+    ) {
+
+      throw new Error(
+        "The Worker did not return a workspace architecture."
+      );
+
+    }
+
+
+    clearInterval(
+      progressTimer
+    );
+
+
+    showProgress(5);
+
+
+    await new Promise(
+      resolve =>
+        setTimeout(
+          resolve,
+          500
+        )
+    );
+
+
+    renderArchitecture(
+      data.architecture
+    );
+
+
+    statusEl.textContent =
+      `Workspace architecture created with ${
+        Array.isArray(
+          data.architecture.layers
+        )
+          ? data.architecture.layers.length
+          : 0
+      } dynamically designed layers.`;
+
+
+  } catch (error) {
+
+
+    console.error(
+      "Stack build error:",
+      error
+    );
+
+
+    clearInterval(
+      progressTimer
+    );
+
+
+    outputEl.innerHTML =
+      `
+
+        <div class="builder-error">
+
+          <h3>
+            The workspace could not be built.
+          </h3>
+
+          <p>
+            ${escapeHTML(
+              error.message
+            )}
+          </p>
+
+          <p class="builder-error-help">
+
+            The current ecosystem remains available.
+            Try building again or adjust the workspace goal.
+
+          </p>
 
         </div>
 
       `;
 
 
-    }
+    statusEl.textContent =
+      "Workspace build failed.";
 
+  } finally {
 
 
-    /*
-    =========================================================
-    RENDER ARCHITECTURE
-    =========================================================
-    */
+    isBuilding =
+      false;
 
 
-    function renderArchitecture(
-      architecture
-    ) {
+    buildButton.disabled =
+      false;
 
 
-      const output =
-        document.getElementById(
-          "generated-stack"
-        );
+    buildButton.innerHTML =
+      `
+        Build My Stack
+        <span>→</span>
+      `;
 
+  }
 
-      if (!architecture) {
+}
 
 
-        output.innerHTML = `
+/*
+==========================================================
+BUILD BUTTON
+==========================================================
+*/
 
-          <div class="builder-error">
+if (buildButton) {
 
-            No workspace architecture was returned.
+  buildButton.addEventListener(
+    "click",
+    buildStack
+  );
 
-          </div>
+}
 
-        `;
 
+/*
+==========================================================
+EXAMPLE GOALS
+==========================================================
+*/
 
-        return;
+const exampleGoals = {
 
-      }
+  research:
+    `Build an autonomous research workspace that discovers reliable information, analyzes multiple sources, organizes findings, remembers important context, and produces structured research reports.`,
 
+  content:
+    `Build an autonomous content workspace that researches topics, creates long-form articles, generates social media content, organizes drafts, and continuously improves content quality.`,
 
+  coding:
+    `Build a coding workspace that analyzes software requirements, writes code, runs tests, detects problems, and continuously improves the implementation.`,
 
-      const goalSummary =
-        architecture.goal_summary ||
-        architecture.workspace_understanding ||
-        "";
+  marketing:
+    `Build an autonomous marketing workspace that researches audiences, creates campaigns, generates content, analyzes performance, and continuously improves marketing results.`
 
+};
 
-      const capabilities =
-        Array.isArray(
-          architecture.core_capabilities
-        )
 
-          ? architecture.core_capabilities
+/*
+==========================================================
+EXAMPLE BUTTONS
+==========================================================
+*/
 
-          : [];
+document
+  .querySelectorAll(
+    "[data-example]"
+  )
+  .forEach(
+    button => {
 
-
-      const layers =
-        Array.isArray(
-          architecture.layers
-        )
-
-          ? architecture.layers
-
-          : [];
-
-
-      const gaps =
-        Array.isArray(
-          architecture.gaps
-        )
-
-          ? architecture.gaps
-
-          : [];
-
-
-      /*
-      External recommendations support.
-
-      This allows the new Worker to return
-      external capabilities if it performs
-      gap research.
-      */
-
-
-      const recommendations =
-        Array.isArray(
-          architecture.recommendations
-        )
-
-          ? architecture.recommendations
-
-          : Array.isArray(
-              architecture.external_recommendations
-            )
-
-            ? architecture.external_recommendations
-
-            : [];
-
-
-      const architectureSummary =
-        architecture.architecture_summary ||
-        architecture.final_architecture_summary ||
-        "";
-
-
-
-      let html = "";
-
-
-
-      /*
-      =======================================================
-      WORKSPACE UNDERSTANDING
-      =======================================================
-      */
-
-
-      if (goalSummary) {
-
-
-        html += `
-
-          <div class="workspace-understanding">
-
-            <div class="generated-section-label">
-
-              WORKSPACE UNDERSTANDING
-
-            </div>
-
-            <p>
-
-              ${escapeHTML(goalSummary)}
-
-            </p>
-
-          </div>
-
-        `;
-
-
-      }
-
-
-
-      /*
-      =======================================================
-      REQUIRED CAPABILITIES
-      =======================================================
-      */
-
-
-      if (capabilities.length) {
-
-
-        html += `
-
-          <div class="required-capabilities">
-
-            <div class="generated-section-label">
-
-              REQUIRED CAPABILITIES
-
-            </div>
-
-        `;
-
-
-        capabilities.forEach(
-          capability => {
-
-
-            const name =
-              capability.name ||
-              "Capability";
-
-
-            const reason =
-              capability.reason ||
-              "";
-
-
-            html += `
-
-              <div class="capability-item">
-
-                <strong>
-
-                  ${escapeHTML(name)}
-
-                </strong>
-
-                <p>
-
-                  ${escapeHTML(reason)}
-
-                </p>
-
-              </div>
-
-            `;
-
-
-          }
-        );
-
-
-        html += `
-
-          </div>
-
-        `;
-
-
-      }
-
-
-
-      /*
-      =======================================================
-      LAYERS
-      =======================================================
-      */
-
-
-      layers.forEach(
-        (layer, index) => {
-
-
-          const number =
-            layer.number ||
-            index + 1;
-
-
-          const name =
-            layer.name ||
-            "Workspace Layer";
-
-
-          const purpose =
-            layer.purpose ||
-            "";
-
-
-          const whyNeeded =
-            layer.why_needed ||
-            layer.reason ||
-            "";
-
-
-          const agents =
-            Array.isArray(layer.agents)
-              ? layer.agents
-              : [];
-
-
-          const tools =
-            Array.isArray(layer.tools)
-              ? layer.tools
-              : [];
-
-
-          html += `
-
-            <div class="generated-layer">
-
-
-              <div class="generated-layer-head">
-
-
-                <div class="generated-number">
-
-                  ${String(number)
-                    .padStart(2, "0")}
-
-                </div>
-
-
-                <div class="generated-layer-content">
-
-
-                  <div class="generated-section-label">
-
-                    WORKSPACE LAYER
-
-                  </div>
-
-
-                  <h3>
-
-                    ${escapeHTML(name)}
-
-                  </h3>
-
-
-                  ${purpose
-                    ? `
-
-                      <p class="layer-purpose">
-
-                        ${escapeHTML(purpose)}
-
-                      </p>
-
-                    `
-                    : ""
-                  }
-
-
-                  ${whyNeeded
-                    ? `
-
-                      <p class="layer-reason">
-
-                        <strong>
-
-                          Why this layer exists:
-
-                        </strong>
-
-                        ${escapeHTML(whyNeeded)}
-
-                      </p>
-
-                    `
-                    : ""
-                  }
-
-
-                </div>
-
-
-              </div>
-
-
-
-              ${
-                agents.length
-                  ? `
-
-                    <div class="generated-component-group">
-
-
-                      <h4>
-
-                        Selected Agents
-
-                      </h4>
-
-
-                      ${agents
-                        .map(agent =>
-                          renderComponent(
-                            agent,
-                            "Agent"
-                          )
-                        )
-                        .join("")
-                      }
-
-
-                    </div>
-
-                  `
-
-                  : ""
-              }
-
-
-
-              ${
-                tools.length
-                  ? `
-
-                    <div class="generated-component-group">
-
-
-                      <h4>
-
-                        Selected Tools
-
-                      </h4>
-
-
-                      ${tools
-                        .map(tool =>
-                          renderComponent(
-                            tool,
-                            "Tool"
-                          )
-                        )
-                        .join("")
-                      }
-
-
-                    </div>
-
-                  `
-
-                  : ""
-              }
-
-
-            </div>
-
-          `;
-
-
-        }
-      );
-
-
-
-      /*
-      =======================================================
-      GAPS
-      =======================================================
-      */
-
-
-      if (gaps.length) {
-
-
-        html += `
-
-          <div class="capability-gaps">
-
-
-            <div class="generated-section-label">
-
-              ⚠ CAPABILITY GAPS DETECTED
-
-            </div>
-
-        `;
-
-
-        gaps.forEach(
-          gap => {
-
-
-            const capability =
-              gap.capability ||
-              gap.name ||
-              "Missing capability";
-
-
-            const reason =
-              gap.reason ||
-              "";
-
-
-            html += `
-
-              <div class="gap-item">
-
-
-                <strong>
-
-                  ${escapeHTML(capability)}
-
-                </strong>
-
-
-                ${reason
-                  ? `
-
-                    <span>
-
-                      —
-
-                    </span>
-
-                    ${escapeHTML(reason)}
-
-                  `
-                  : ""
-                }
-
-
-              </div>
-
-            `;
-
-
-          }
-        );
-
-
-        html += `
-
-          </div>
-
-        `;
-
-
-      }
-
-
-
-      /*
-      =======================================================
-      EXTERNAL RECOMMENDATIONS
-      =======================================================
-      */
-
-
-      if (recommendations.length) {
-
-
-        html += `
-
-          <div class="external-recommendations">
-
-
-            <div class="generated-section-label">
-
-              RECOMMENDED CAPABILITIES
-
-            </div>
-
-
-            <p class="recommendation-intro">
-
-              These capabilities were identified during
-              architecture evaluation because the current
-              directory may not fully satisfy the workspace
-              requirements.
-
-            </p>
-
-        `;
-
-
-        recommendations.forEach(
-          recommendation => {
-
-
-            const name =
-              recommendation.name ||
-              recommendation.capability ||
-              "Recommended capability";
-
-
-            const reason =
-              recommendation.reason ||
-              recommendation.why ||
-              "";
-
-
-            const url =
-              recommendation.url ||
-              "";
-
-
-            html += `
-
-              <div class="recommendation-item">
-
-
-                <strong>
-
-                  ${escapeHTML(name)}
-
-                </strong>
-
-
-                ${reason
-                  ? `
-
-                    <p>
-
-                      ${escapeHTML(reason)}
-
-                    </p>
-
-                  `
-                  : ""
-                }
-
-
-                ${url
-                  ? `
-
-                    <a
-                      href="${escapeHTML(url)}"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      class="capability-link"
-                    >
-
-                      Explore recommendation →
-
-                    </a>
-
-                  `
-                  : ""
-                }
-
-
-              </div>
-
-            `;
-
-
-          }
-        );
-
-
-        html += `
-
-          </div>
-
-        `;
-
-
-      }
-
-
-
-      /*
-      =======================================================
-      ARCHITECTURE LOGIC
-      =======================================================
-      */
-
-
-      if (architectureSummary) {
-
-
-        html += `
-
-          <div class="architecture-summary">
-
-
-            <div class="generated-section-label">
-
-              ARCHITECTURE LOGIC
-
-            </div>
-
-
-            <p>
-
-              ${escapeHTML(
-                architectureSummary
-              )}
-
-            </p>
-
-
-          </div>
-
-        `;
-
-
-      }
-
-
-
-      output.innerHTML =
-        html;
-
-
-    }
-
-
-
-    /*
-    =========================================================
-    BUILD STACK
-    =========================================================
-    */
-
-
-    async function buildStack() {
-
-
-      if (isBuilding) {
-        return;
-      }
-
-
-      const goalInput =
-        document.getElementById(
-          "workspace-goal"
-        );
-
-
-      const buildButton =
-        document.getElementById(
-          "build-stack"
-        );
-
-
-      const status =
-        document.getElementById(
-          "stack-status"
-        );
-
-
-      const output =
-        document.getElementById(
-          "generated-stack"
-        );
-
-
-      const goal =
-        goalInput.value.trim();
-
-
-
-      /*
-      Validate goal.
-      */
-
-
-      if (!goal) {
-
-
-        status.textContent =
-          "Please describe what you want your autonomous workspace to do.";
-
-
-        goalInput.focus();
-
-
-        return;
-
-
-      }
-
-
-
-      /*
-      Validate ecosystem.
-      */
-
-
-      if (!ecosystem.length) {
-
-
-        status.textContent =
-          "Loading the current ecosystem before building your workspace...";
-
-
-        await loadEcosystem();
-
-
-      }
-
-
-      if (!ecosystem.length) {
-
-
-        status.textContent =
-          "No ecosystem data is available. Please try again.";
-
-
-        return;
-
-
-      }
-
-
-
-      /*
-      Start building.
-      */
-
-
-      isBuilding = true;
-
-
-      buildButton.disabled =
-        true;
-
-
-      buildButton.innerHTML =
-        `
-
-          Building Workspace...
-
-        `;
-
-
-      output.innerHTML =
-        "";
-
-
-      resetProgress();
-
-
-      setProgress(
-        "progress-understand"
-      );
-
-
-      status.textContent =
-        "Understanding your workspace goal...";
-
-
-      /*
-      Visual progress.
-
-      The Worker does the real reasoning.
-      These stages show the user what the
-      autonomous architecture process is doing.
-      */
-
-
-      const progressTimer =
-        setInterval(
-          () => {
-
-
-            const active =
-              document.querySelector(
-                ".progress-step.active"
-              );
-
-
-            if (!active) {
-              return;
-            }
-
-
-            const next =
-              active.nextElementSibling;
-
-
-            if (next) {
-
-
-              active.classList.remove(
-                "active"
-              );
-
-
-              active.classList.add(
-                "complete"
-              );
-
-
-              next.classList.add(
-                "active"
-              );
-
-
-            }
-
-
-          },
-          3000
-        );
-
-
-
-      try {
-
-
-        /*
-        Send:
-
-        1. User goal
-        2. Actual Airtable ecosystem
-
-        to the autonomous Worker.
-        */
-
-
-        const response =
-          await fetch(
-            WORKER_URL +
-            "/build-stack",
-            {
-              method: "POST",
-
-              headers: {
-                "Content-Type":
-                  "application/json"
-              },
-
-              body: JSON.stringify({
-                goal,
-                ecosystem
-              })
-
-            }
-          );
-
-
-
-        /*
-        Try to read JSON even when
-        the Worker returns an error.
-        */
-
-
-        let data;
-
-
-        try {
-
-
-          data =
-            await response.json();
-
-
-        } catch {
-
-
-          throw new Error(
-            "The Worker returned an invalid response."
-          );
-
-
-        }
-
-
-
-        if (!response.ok) {
-
-
-          console.error(
-            "Worker error:",
-            data
-          );
-
-
-          throw new Error(
-            data.error ||
-            "The workspace could not be built."
-          );
-
-
-        }
-
-
-
-        if (!data.success) {
-
-
-          throw new Error(
-            data.error ||
-            "The workspace could not be built."
-          );
-
-
-        }
-
-
-
-        if (!data.architecture) {
-
-
-          throw new Error(
-            "The Worker did not return a workspace architecture."
-          );
-
-
-        }
-
-
-
-        /*
-        Complete progress.
-        */
-
-
-        clearInterval(
-          progressTimer
-        );
-
-
-        setProgress(
-          "progress-review"
-        );
-
-
-        setTimeout(
-          () => {
-
-
-            completeProgress();
-
-
-          },
-          400
-        );
-
-
-
-        /*
-        Render architecture.
-        */
-
-
-        renderArchitecture(
-          data.architecture
-        );
-
-
-        status.textContent =
-          "Your autonomous workspace architecture is ready.";
-
-
-
-      } catch (error) {
-
-
-        clearInterval(
-          progressTimer
-        );
-
-
-        console.error(
-          error
-        );
-
-
-        status.textContent =
-          error.message ||
-          "The workspace could not be built. Please try again.";
-
-
-        output.innerHTML =
-          `
-
-            <div class="builder-error">
-
-              <strong>
-
-                The workspace could not be built.
-
-              </strong>
-
-              <p>
-
-                ${escapeHTML(
-                  error.message ||
-                  "Please check the Worker configuration and try again."
-                )}
-
-              </p>
-
-            </div>
-
-          `;
-
-
-      } finally {
-
-
-        isBuilding = false;
-
-
-        buildButton.disabled =
-          false;
-
-
-        buildButton.innerHTML =
-          `
-
-            Build My Stack
-
-            <span>
-              →
-            </span>
-
-          `;
-
-
-      }
-
-
-    }
-
-
-
-    /*
-    =========================================================
-    BUILD BUTTON
-    =========================================================
-    */
-
-
-    document
-      .getElementById(
-        "build-stack"
-      )
-
-      .addEventListener(
+      button.addEventListener(
         "click",
-        buildStack
+        () => {
+
+          const key =
+            button.dataset.example;
+
+
+          if (
+            exampleGoals[key] &&
+            goalInput
+          ) {
+
+            goalInput.value =
+              exampleGoals[key];
+
+
+            goalInput.focus();
+
+
+            goalInput.scrollIntoView({
+              behavior:
+                "smooth",
+              block:
+                "center"
+            });
+
+          }
+
+        }
       );
 
+    }
+  );
 
 
-    /*
-    =========================================================
-    INITIAL LOAD
-    =========================================================
-    */
+/*
+==========================================================
+INITIAL LOAD
+==========================================================
+*/
 
+loadEcosystem();
 
-    loadEcosystem();
-
-
-  </script>
-
+</script>
 
 </body>
-
-</html>
+  </html>
