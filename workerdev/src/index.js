@@ -6,9 +6,10 @@ export default {
       "Access-Control-Allow-Headers": "Content-Type",
     };
 
-    // ---------------------------------------------------------
-    // CORS PREFLIGHT
-    // ---------------------------------------------------------
+    // ========================================================
+    // CORS
+    // ========================================================
+
     if (request.method === "OPTIONS") {
       return new Response(null, {
         status: 204,
@@ -16,15 +17,14 @@ export default {
       });
     }
 
-    // ---------------------------------------------------------
+    // ========================================================
     // GET
-    // ---------------------------------------------------------
-    // IMPORTANT:
-    // GET remains connected to Airtable because the directory
-    // pages still need Airtable data.
+    // ========================================================
+    // Airtable remains ONLY for the public directory.
     //
-    // The Stack Builder does NOT use this data.
-    // ---------------------------------------------------------
+    // The Stack Builder does NOT use Airtable.
+    // ========================================================
+
     if (request.method === "GET") {
       try {
         const BASE_ID = "appY6TPhOsmj3dIX8";
@@ -97,24 +97,10 @@ export default {
       }
     }
 
-    // ---------------------------------------------------------
+    // ========================================================
     // POST /build-stack
-    // ---------------------------------------------------------
-    // IMPORTANT:
-    // The Stack Builder is completely independent of Airtable.
-    //
-    // It receives the user's goal and asks the LLM to:
-    //
-    // 1. Understand the goal
-    // 2. Identify required capabilities
-    // 3. Find suitable agents/tools from its knowledge
-    // 4. Design the workspace
-    // 5. Evaluate component matches
-    // 6. Identify capability gaps
-    // 7. Solve the gaps
-    // 8. Produce the final architecture
-    // 9. Perform a final self-review
-    // ---------------------------------------------------------
+    // ========================================================
+
     if (
       request.method === "POST" &&
       new URL(request.url).pathname === "/build-stack"
@@ -146,76 +132,78 @@ export default {
           );
         }
 
-        // -----------------------------------------------------
-        // DISCOVER CURRENT FREE OPENROUTER MODELS
-        // -----------------------------------------------------
+        // ====================================================
+        // DISCOVER FREE OPENROUTER MODELS
+        // ====================================================
+
         const freeModels = await discoverFreeModels(env);
 
-        // -----------------------------------------------------
+        // ====================================================
         // BUILD MODEL FALLBACK LIST
-        // -----------------------------------------------------
-        //
-        // openrouter/free is attempted first.
-        //
-        // Then explicitly discovered free models are supplied
-        // to OpenRouter as native fallbacks.
-        // -----------------------------------------------------
+        // ====================================================
+
         const fallbackModels = buildFallbackModels(freeModels);
 
-        // -----------------------------------------------------
-        // MAIN BUILDER PROMPT
-        // -----------------------------------------------------
+        // ====================================================
+        // SYSTEM PROMPT
+        // ====================================================
+
         const systemPrompt = `
-You are the intelligence engine for Autonomous Work Space.
+You are the core intelligence engine for Autonomous Work Space.
 
-Your job is to transform a user's natural-language work goal into a practical autonomous workspace architecture.
+Your task is to transform a user's natural-language work goal into a practical autonomous workspace.
 
-You are NOT limited to a predefined directory.
+The workspace should be designed specifically around the user's goal.
 
-You should use your own knowledge of AI agents, AI tools, automation platforms, APIs, infrastructure, databases, communication systems, browsers, coding systems, research systems, memory systems, orchestration systems, and other relevant technologies.
+Do not assume that the workspace must use a predefined directory.
 
-The user wants the most appropriate components for the goal.
+You may identify suitable agents, tools, platforms, services, infrastructure, databases, APIs, automation systems, research systems, coding systems, communication systems, memory systems, orchestration systems, and other technologies from your knowledge.
 
-Think carefully about the actual work that must be performed rather than simply matching keywords.
+The architecture should be realistic and internally consistent.
 
-Your reasoning process should cover:
+Think through the complete problem before producing the final JSON.
+
+Your internal process should include:
 
 1. Understand the user's goal.
-2. Identify the work that needs to happen.
+2. Determine what work actually needs to be performed.
 3. Identify the capabilities required.
-4. Find suitable agents and tools from your knowledge.
-5. Consider alternatives where appropriate.
-6. Select components that can realistically perform the required work.
-7. Design how the components interact.
-8. Evaluate whether each component actually matches its responsibility.
-9. Identify missing capabilities or weaknesses.
-10. Solve those gaps by adding, replacing, or restructuring components.
-11. Produce a final coherent autonomous workspace.
-12. Perform a final self-review for practicality, completeness, unnecessary complexity, and obvious capability gaps.
+4. Identify suitable agents and tools.
+5. Design the workspace architecture.
+6. Organize the architecture into logical layers.
+7. Evaluate whether each selected component matches its responsibility.
+8. Identify capability gaps.
+9. Solve those gaps.
+10. Rebuild or improve the architecture where necessary.
+11. Perform a final self-review.
+12. Return the final architecture.
 
 IMPORTANT:
 
-- Do not assume that every goal needs many components.
-- Do not add components merely to make the architecture look sophisticated.
-- Prefer simple architectures when they are sufficient.
-- Use multiple components when the workflow genuinely requires them.
-- Clearly distinguish agents from tools.
-- Agents perform reasoning or autonomous work.
-- Tools provide capabilities, services, infrastructure, integrations, storage, communication, execution, monitoring, etc.
-- Components may be external products or technologies that are appropriate for the goal.
-- Explain why each important component is included.
-- If a capability is difficult to automate fully, explicitly identify the limitation.
+- Do not add components simply to make the architecture look impressive.
+- Use only components that have a meaningful role.
+- A small architecture is acceptable when the goal is simple.
+- A complex architecture is acceptable when the goal genuinely requires it.
+- Distinguish agents from tools.
+- Agents perform reasoning, decision-making, research, creation, analysis, or autonomous work.
+- Tools provide capabilities, infrastructure, integrations, storage, communication, execution, monitoring, scheduling, retrieval, etc.
+- Think about repeated autonomous operation.
+- Think about inputs, processing, decisions, actions, outputs, memory, monitoring and recovery when relevant.
 - Do not invent nonexistent products.
-- If uncertain about a product detail, describe the capability rather than inventing a specific feature.
-- Think about how the workspace could operate repeatedly with minimal human intervention.
-- Think about inputs, processing, decisions, actions, outputs, memory, monitoring, and failure recovery where relevant.
+- If uncertain about an exact product capability, describe the required capability rather than inventing unsupported details.
+- Keep the final architecture internally consistent.
+- Components mentioned in the layers should correspond to the agents/tools in the architecture.
+- Capability recommendations must have actual names and explanations.
+- Never use generic placeholder text such as "Recommended capability".
+- Layers must be dynamically designed around the actual workflow. Do not always use the same fixed number of layers.
 
-Return ONLY valid JSON.
+The output MUST be valid JSON.
 
-The JSON must follow this structure:
+Return this exact overall structure:
 
 {
   "goal": "...",
+
   "goal_understanding": "...",
 
   "required_capabilities": [
@@ -244,6 +232,24 @@ The JSON must follow this structure:
       "role": "...",
       "reason": "...",
       "fit": "High|Medium|Low"
+    }
+  ],
+
+  "layers": [
+    {
+      "name": "...",
+      "purpose": "...",
+      "order": 1,
+      "components": [
+        {
+          "name": "...",
+          "type": "Agent|Tool",
+          "role": "...",
+          "reason": "..."
+        }
+      ],
+      "inputs": ["..."],
+      "outputs": ["..."]
     }
   ],
 
@@ -302,11 +308,20 @@ The JSON must follow this structure:
   "human_involvement": "...",
 
   "recommendations": [
-    "..."
+    {
+      "name": "...",
+      "reason": "...",
+      "priority": "High|Medium|Low"
+    }
   ],
 
   "external_recommendations": [
-    "..."
+    {
+      "name": "...",
+      "type": "Agent|Tool|Platform|Service|Other",
+      "reason": "...",
+      "use_for": "..."
+    }
   ],
 
   "review": {
@@ -323,27 +338,66 @@ The JSON must follow this structure:
   }
 }
 
-The final answer must be internally coherent.
+VERY IMPORTANT:
 
-The agents, tools, workflow, architecture, gaps, gap solutions, and final architecture must describe the same workspace.
+The "layers" array is required.
 
-Do not output markdown.
-Do not wrap the JSON in code fences.
+Do not return an empty layers array unless the goal genuinely requires no architecture.
+
+Every layer must represent a real functional stage or subsystem of the workspace.
+
+The number of layers must be determined by the goal.
+
+The "recommendations" array must contain objects with:
+- name
+- reason
+- priority
+
+The "external_recommendations" array must contain objects with:
+- name
+- type
+- reason
+- use_for
+
+Never return repeated generic text.
+
+Return ONLY JSON.
+Do not return markdown.
+Do not return code fences.
+Do not provide commentary outside the JSON.
 `;
+
+        // ====================================================
+        // USER PROMPT
+        // ====================================================
 
         const userPrompt = `
 USER WORKSPACE GOAL:
 
 ${goal}
 
-Build the complete autonomous workspace for this goal.
+Design the complete autonomous workspace for this goal.
 
-Do the discovery, architecture design, component evaluation, gap solving, rebuilding, and final self-review internally before returning the final JSON.
+Internally perform:
+
+GOAL UNDERSTANDING
+→ CAPABILITY IDENTIFICATION
+→ AGENT AND TOOL DISCOVERY
+→ ARCHITECTURE DESIGN
+→ DYNAMIC LAYER DESIGN
+→ COMPONENT EVALUATION
+→ GAP IDENTIFICATION
+→ GAP SOLVING
+→ FINAL ARCHITECTURE
+→ SELF-REVIEW
+
+The final JSON must represent the complete result of that process.
 `;
 
-        // -----------------------------------------------------
+        // ====================================================
         // CALL OPENROUTER
-        // -----------------------------------------------------
+        // ====================================================
+
         const result = await callOpenRouter({
           env,
           systemPrompt,
@@ -363,9 +417,10 @@ Do the discovery, architecture design, component evaluation, gap solving, rebuil
           );
         }
 
-        // -----------------------------------------------------
-        // PARSE LLM JSON
-        // -----------------------------------------------------
+        // ====================================================
+        // PARSE JSON
+        // ====================================================
+
         let architecture;
 
         try {
@@ -377,16 +432,17 @@ Do the discovery, architecture design, component evaluation, gap solving, rebuil
               details: error?.message || String(error),
               model_used: result.model,
               model_attempts: result.attempts || [],
-              raw_preview: String(result.content || "").slice(0, 2000),
+              raw_preview: String(result.content || "").slice(0, 3000),
             },
             502,
             corsHeaders
           );
         }
 
-        // -----------------------------------------------------
-        // NORMALIZE OUTPUT
-        // -----------------------------------------------------
+        // ====================================================
+        // NORMALIZE FRONTEND STRUCTURE
+        // ====================================================
+
         architecture = normalizeArchitecture(
           architecture,
           goal,
@@ -394,9 +450,10 @@ Do the discovery, architecture design, component evaluation, gap solving, rebuil
           result.attempts
         );
 
-        // -----------------------------------------------------
-        // RETURN FINAL WORKSPACE
-        // -----------------------------------------------------
+        // ====================================================
+        // RETURN
+        // ====================================================
+
         return jsonResponse(
           {
             success: true,
@@ -417,9 +474,10 @@ Do the discovery, architecture design, component evaluation, gap solving, rebuil
       }
     }
 
-    // ---------------------------------------------------------
+    // ========================================================
     // UNKNOWN ROUTE
-    // ---------------------------------------------------------
+    // ========================================================
+
     return new Response("Not found", {
       status: 404,
       headers: corsHeaders,
@@ -429,7 +487,7 @@ Do the discovery, architecture design, component evaluation, gap solving, rebuil
 
 
 // ============================================================
-// OPENROUTER FREE MODEL DISCOVERY
+// FREE MODEL DISCOVERY
 // ============================================================
 
 async function discoverFreeModels(env) {
@@ -450,9 +508,11 @@ async function discoverFreeModels(env) {
 
     const data = await response.json();
 
-    const models = Array.isArray(data?.data) ? data.data : [];
+    const models = Array.isArray(data?.data)
+      ? data.data
+      : [];
 
-    const free = [];
+    const freeModels = [];
 
     for (const model of models) {
       const id = model?.id;
@@ -461,13 +521,13 @@ async function discoverFreeModels(env) {
         continue;
       }
 
-      // Explicit :free models
+      // Explicit free model variants.
       if (id.endsWith(":free")) {
-        free.push(id);
+        freeModels.push(id);
         continue;
       }
 
-      // Models whose pricing is explicitly zero
+      // Explicitly zero-priced models.
       const promptPrice = model?.pricing?.prompt;
       const completionPrice = model?.pricing?.completion;
 
@@ -475,11 +535,11 @@ async function discoverFreeModels(env) {
         (promptPrice === "0" || promptPrice === 0) &&
         (completionPrice === "0" || completionPrice === 0)
       ) {
-        free.push(id);
+        freeModels.push(id);
       }
     }
 
-    return [...new Set(free)];
+    return [...new Set(freeModels)];
   } catch {
     return [];
   }
@@ -487,16 +547,16 @@ async function discoverFreeModels(env) {
 
 
 // ============================================================
-// BUILD FALLBACK MODEL LIST
+// MODEL FALLBACK LIST
 // ============================================================
 
 function buildFallbackModels(freeModels) {
-  const result = [];
+  const models = [];
 
-  // Always attempt the OpenRouter Free Models Router first.
-  result.push("openrouter/free");
+  // First choice.
+  models.push("openrouter/free");
 
-  // Then use explicitly discovered free models.
+  // Explicitly discovered free models.
   for (const model of freeModels || []) {
     if (!model || typeof model !== "string") {
       continue;
@@ -506,20 +566,18 @@ function buildFallbackModels(freeModels) {
       continue;
     }
 
-    if (!result.includes(model)) {
-      result.push(model);
+    if (!models.includes(model)) {
+      models.push(model);
     }
   }
 
-  // Keep the fallback list reasonably small.
-  // The OpenRouter free router itself can already select
-  // an appropriate free model.
-  return result.slice(0, 25);
+  // Avoid an unnecessarily huge fallback request.
+  return models.slice(0, 25);
 }
 
 
 // ============================================================
-// OPENROUTER REQUEST
+// OPENROUTER CALL
 // ============================================================
 
 async function callOpenRouter({
@@ -546,12 +604,10 @@ async function callOpenRouter({
   const attempts = [];
 
   // ----------------------------------------------------------
-  // FIRST TRY:
-  // Use OpenRouter's native model fallback mechanism.
-  //
-  // If a model fails, OpenRouter can automatically try the
-  // next model in this array.
+  // FIRST:
+  // Native OpenRouter fallback.
   // ----------------------------------------------------------
+
   const nativeResult = await requestOpenRouter({
     apiKey,
     models,
@@ -566,11 +622,8 @@ async function callOpenRouter({
   }
 
   // ----------------------------------------------------------
-  // SECOND TRY:
-  // Explicitly try each free model individually.
-  //
-  // This is an additional recovery layer in case the native
-  // fallback request itself fails.
+  // SECOND:
+  // Explicit individual free-model recovery.
   // ----------------------------------------------------------
 
   for (const model of models) {
@@ -615,14 +668,14 @@ async function requestOpenRouter({
   systemPrompt,
   userPrompt,
 }) {
-  const url = "https://openrouter.ai/api/v1/chat/completions";
+  const url =
+    "https://openrouter.ai/api/v1/chat/completions";
 
   const attempts = [];
 
   const controller = new AbortController();
 
-  // Long enough for free models to reason without making the
-  // request excessively easy to kill.
+  // 90-second timeout.
   const timeout = setTimeout(() => {
     controller.abort();
   }, 90000);
@@ -631,14 +684,18 @@ async function requestOpenRouter({
     const response = await fetch(url, {
       method: "POST",
       signal: controller.signal,
+
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://autonomouswork-directory.pages.dev/",
+        "HTTP-Referer":
+          "https://autonomouswork-directory.pages.dev/",
         "X-Title": "Autonomous Work Space",
       },
+
       body: JSON.stringify({
         models,
+
         messages: [
           {
             role: "system",
@@ -650,12 +707,8 @@ async function requestOpenRouter({
           },
         ],
 
-        // Deliberately NOT using response_format here.
-        // Some free models have inconsistent structured-output
-        // support.
         temperature: 0.2,
 
-        // Large enough for architecture JSON but not excessive.
         max_tokens: 10000,
       }),
     });
@@ -669,12 +722,13 @@ async function requestOpenRouter({
         models,
         success: false,
         status: response.status,
-        error: rawText.slice(0, 1000),
+        error: rawText.slice(0, 1500),
       });
 
       return {
         ok: false,
-        error: `OpenRouter request failed with HTTP ${response.status}.`,
+        error:
+          `OpenRouter request failed with HTTP ${response.status}.`,
         attempts,
       };
     }
@@ -688,12 +742,14 @@ async function requestOpenRouter({
         models,
         success: false,
         status: response.status,
-        error: "OpenRouter returned invalid JSON.",
+        error:
+          "OpenRouter returned invalid JSON.",
       });
 
       return {
         ok: false,
-        error: "OpenRouter returned invalid JSON.",
+        error:
+          "OpenRouter returned invalid JSON.",
         attempts,
       };
     }
@@ -705,12 +761,14 @@ async function requestOpenRouter({
         models,
         success: false,
         status: response.status,
-        error: "No assistant content returned.",
+        error:
+          "No assistant content returned.",
       });
 
       return {
         ok: false,
-        error: "OpenRouter returned no assistant content.",
+        error:
+          "OpenRouter returned no assistant content.",
         attempts,
       };
     }
@@ -718,7 +776,8 @@ async function requestOpenRouter({
     const modelUsed =
       data?.model ||
       data?.choices?.[0]?.model ||
-      (Array.isArray(models) ? models[0] : "unknown");
+      models?.[0] ||
+      "unknown";
 
     attempts.push({
       models,
@@ -761,7 +820,8 @@ async function requestOpenRouter({
 // ============================================================
 
 function extractAssistantContent(data) {
-  const message = data?.choices?.[0]?.message;
+  const message =
+    data?.choices?.[0]?.message;
 
   if (!message) {
     return "";
@@ -773,7 +833,6 @@ function extractAssistantContent(data) {
     return content.trim();
   }
 
-  // Some models/providers can return content as blocks.
   if (Array.isArray(content)) {
     let combined = "";
 
@@ -801,7 +860,7 @@ function extractAssistantContent(data) {
 
 
 // ============================================================
-// ROBUST JSON EXTRACTION
+// JSON EXTRACTION
 // ============================================================
 
 function extractJSON(text) {
@@ -811,34 +870,37 @@ function extractJSON(text) {
 
   let cleaned = text.trim();
 
-  // Remove markdown code fences if a model ignored the
-  // instruction and returned ```json ... ```
+  // Remove markdown fences if a model added them.
   cleaned = cleaned
     .replace(/^```json\s*/i, "")
     .replace(/^```\s*/i, "")
     .replace(/\s*```$/i, "")
     .trim();
 
-  // First attempt: entire response is JSON.
+  // Try entire response.
   try {
     return JSON.parse(cleaned);
   } catch {
-    // Continue to extraction.
+    // Continue.
   }
 
-  // Locate the first JSON object.
   const firstObject = cleaned.indexOf("{");
 
   if (firstObject === -1) {
-    throw new Error("No JSON object found in AI response.");
+    throw new Error(
+      "No JSON object found in AI response."
+    );
   }
 
-  // Balanced-brace extraction.
   let depth = 0;
   let inString = false;
   let escaped = false;
 
-  for (let i = firstObject; i < cleaned.length; i++) {
+  for (
+    let i = firstObject;
+    i < cleaned.length;
+    i++
+  ) {
     const char = cleaned[i];
 
     if (escaped) {
@@ -862,11 +924,14 @@ function extractJSON(text) {
 
     if (char === "{") {
       depth++;
-    } else if (char === "}") {
+    }
+
+    if (char === "}") {
       depth--;
 
       if (depth === 0) {
-        const candidate = cleaned.slice(firstObject, i + 1);
+        const candidate =
+          cleaned.slice(firstObject, i + 1);
 
         try {
           return JSON.parse(candidate);
@@ -877,7 +942,9 @@ function extractJSON(text) {
     }
   }
 
-  throw new Error("Could not parse a valid JSON object from AI response.");
+  throw new Error(
+    "Could not parse a valid JSON object from AI response."
+  );
 }
 
 
@@ -891,104 +958,174 @@ function normalizeArchitecture(
   modelUsed,
   attempts
 ) {
-  if (!architecture || typeof architecture !== "object") {
+  if (
+    !architecture ||
+    typeof architecture !== "object"
+  ) {
     architecture = {};
   }
 
   // ----------------------------------------------------------
-  // Basic fields
+  // BASIC
   // ----------------------------------------------------------
 
   architecture.goal =
-    architecture.goal ||
-    goal;
+    architecture.goal || goal;
 
   architecture.goal_understanding =
     architecture.goal_understanding ||
     "The AI analyzed the requested workspace goal.";
 
+  // ----------------------------------------------------------
+  // CAPABILITIES
+  // ----------------------------------------------------------
+
   architecture.required_capabilities =
-    Array.isArray(architecture.required_capabilities)
-      ? architecture.required_capabilities
-      : [];
-
-  architecture.agents =
-    Array.isArray(architecture.agents)
-      ? architecture.agents
-      : [];
-
-  architecture.tools =
-    Array.isArray(architecture.tools)
-      ? architecture.tools
-      : [];
-
-  architecture.workflow =
-    Array.isArray(architecture.workflow)
-      ? architecture.workflow
-      : [];
-
-  architecture.component_evaluation =
-    Array.isArray(architecture.component_evaluation)
-      ? architecture.component_evaluation
-      : [];
-
-  architecture.capability_gaps =
-    Array.isArray(architecture.capability_gaps)
-      ? architecture.capability_gaps
-      : [];
-
-  architecture.gap_solutions =
-    Array.isArray(architecture.gap_solutions)
-      ? architecture.gap_solutions
-      : [];
-
-  architecture.recommendations =
-    Array.isArray(architecture.recommendations)
-      ? architecture.recommendations
-      : [];
-
-  architecture.external_recommendations =
-    Array.isArray(architecture.external_recommendations)
-      ? architecture.external_recommendations
-      : [];
+    normalizeCapabilities(
+      architecture.required_capabilities
+    );
 
   // ----------------------------------------------------------
-  // Architecture summary
+  // AGENTS
+  // ----------------------------------------------------------
+
+  architecture.agents =
+    normalizeComponents(
+      architecture.agents,
+      "Agent"
+    );
+
+  // ----------------------------------------------------------
+  // TOOLS
+  // ----------------------------------------------------------
+
+  architecture.tools =
+    normalizeComponents(
+      architecture.tools,
+      "Tool"
+    );
+
+  // ----------------------------------------------------------
+  // LAYERS
+  // ----------------------------------------------------------
+
+  architecture.layers =
+    normalizeLayers(
+      architecture.layers,
+      architecture.agents,
+      architecture.tools,
+      architecture.workflow,
+      architecture.goal_understanding
+    );
+
+  // ----------------------------------------------------------
+  // ARCHITECTURE SUMMARY
   // ----------------------------------------------------------
 
   architecture.architecture_summary =
     architecture.architecture_summary ||
-    architecture.final_architecture?.summary ||
-    "The workspace architecture was generated around the user's requested goal.";
+    buildArchitectureSummary(
+      architecture.layers,
+      architecture.agents,
+      architecture.tools
+    );
 
   // ----------------------------------------------------------
-  // Final architecture
+  // WORKFLOW
+  // ----------------------------------------------------------
+
+  architecture.workflow =
+    normalizeWorkflow(
+      architecture.workflow,
+      architecture.layers
+    );
+
+  // ----------------------------------------------------------
+  // COMPONENT EVALUATION
+  // ----------------------------------------------------------
+
+  architecture.component_evaluation =
+    Array.isArray(
+      architecture.component_evaluation
+    )
+      ? architecture.component_evaluation
+      : [];
+
+  // ----------------------------------------------------------
+  // GAPS
+  // ----------------------------------------------------------
+
+  architecture.capability_gaps =
+    Array.isArray(
+      architecture.capability_gaps
+    )
+      ? architecture.capability_gaps
+      : [];
+
+  architecture.gap_solutions =
+    Array.isArray(
+      architecture.gap_solutions
+    )
+      ? architecture.gap_solutions
+      : [];
+
+  // ----------------------------------------------------------
+  // FINAL ARCHITECTURE
   // ----------------------------------------------------------
 
   if (
     !architecture.final_architecture ||
-    typeof architecture.final_architecture !== "object"
+    typeof architecture.final_architecture !==
+      "object"
   ) {
     architecture.final_architecture = {};
   }
 
   architecture.final_architecture.agents =
-    Array.isArray(architecture.final_architecture.agents)
+    Array.isArray(
+      architecture.final_architecture.agents
+    )
       ? architecture.final_architecture.agents
-      : architecture.agents.map((agent) => agent.name);
+      : architecture.agents.map(
+          (agent) => agent.name
+        );
 
   architecture.final_architecture.tools =
-    Array.isArray(architecture.final_architecture.tools)
+    Array.isArray(
+      architecture.final_architecture.tools
+    )
       ? architecture.final_architecture.tools
-      : architecture.tools.map((tool) => tool.name);
+      : architecture.tools.map(
+          (tool) => tool.name
+        );
 
   architecture.final_architecture.connections =
-    Array.isArray(architecture.final_architecture.connections)
+    Array.isArray(
+      architecture.final_architecture.connections
+    )
       ? architecture.final_architecture.connections
       : [];
 
   // ----------------------------------------------------------
-  // Review
+  // RECOMMENDATIONS
+  // ----------------------------------------------------------
+
+  architecture.recommendations =
+    normalizeRecommendations(
+      architecture.recommendations
+    );
+
+  // ----------------------------------------------------------
+  // EXTERNAL RECOMMENDATIONS
+  // ----------------------------------------------------------
+
+  architecture.external_recommendations =
+    normalizeExternalRecommendations(
+      architecture.external_recommendations
+    );
+
+  // ----------------------------------------------------------
+  // REVIEW
   // ----------------------------------------------------------
 
   if (
@@ -1000,25 +1137,31 @@ function normalizeArchitecture(
 
   architecture.review.summary =
     architecture.review.summary ||
-    "The proposed workspace was reviewed for capability coverage, component fit, gaps, and practical autonomy.";
+    "The workspace was reviewed for capability coverage, component fit, gaps, and practical autonomy.";
 
   architecture.review.strengths =
-    Array.isArray(architecture.review.strengths)
+    Array.isArray(
+      architecture.review.strengths
+    )
       ? architecture.review.strengths
       : [];
 
   architecture.review.improvements =
-    Array.isArray(architecture.review.improvements)
+    Array.isArray(
+      architecture.review.improvements
+    )
       ? architecture.review.improvements
       : [];
 
   architecture.review.remaining_gaps =
-    Array.isArray(architecture.review.remaining_gaps)
+    Array.isArray(
+      architecture.review.remaining_gaps
+    )
       ? architecture.review.remaining_gaps
       : [];
 
   // ----------------------------------------------------------
-  // Operational fields
+  // OTHER OPERATIONAL FIELDS
   // ----------------------------------------------------------
 
   architecture.autonomy_logic =
@@ -1031,7 +1174,7 @@ function normalizeArchitecture(
     architecture.human_involvement || "";
 
   // ----------------------------------------------------------
-  // Diagnostics
+  // DIAGNOSTICS
   // ----------------------------------------------------------
 
   architecture.model_used =
@@ -1042,26 +1185,854 @@ function normalizeArchitecture(
       ? attempts
       : [];
 
-  architecture.builder_version =
-    "V6";
+  architecture.builder_version = "V7";
 
   architecture.builder_mode =
-    "LLM-first external discovery";
+    "LLM-first dynamic workspace discovery";
 
   return architecture;
 }
 
 
 // ============================================================
-// JSON RESPONSE HELPER
+// NORMALIZE CAPABILITIES
 // ============================================================
 
-function jsonResponse(data, status, corsHeaders) {
-  return new Response(JSON.stringify(data, null, 2), {
-    status,
-    headers: {
-      ...corsHeaders,
-      "Content-Type": "application/json",
-    },
-  });
+function normalizeCapabilities(capabilities) {
+  if (!Array.isArray(capabilities)) {
+    return [];
+  }
+
+  return capabilities
+    .map((item) => {
+      if (typeof item === "string") {
+        return {
+          capability: item,
+          reason:
+            "This capability is relevant to the workspace goal.",
+        };
+      }
+
+      if (!item || typeof item !== "object") {
+        return null;
+      }
+
+      const capability =
+        item.capability ||
+        item.name ||
+        item.title ||
+        "";
+
+      if (!capability) {
+        return null;
+      }
+
+      return {
+        capability,
+        reason:
+          item.reason ||
+          item.description ||
+          "This capability is required by the workspace.",
+      };
+    })
+    .filter(Boolean);
+}
+
+
+// ============================================================
+// NORMALIZE COMPONENTS
+// ============================================================
+
+function normalizeComponents(
+  components,
+  defaultType
+) {
+  if (!Array.isArray(components)) {
+    return [];
+  }
+
+  return components
+    .map((item) => {
+      if (typeof item === "string") {
+        return {
+          name: item,
+          type: defaultType,
+          category: "General",
+          role: item,
+          reason:
+            "Selected because it can contribute to the workspace.",
+          fit: "Medium",
+        };
+      }
+
+      if (!item || typeof item !== "object") {
+        return null;
+      }
+
+      const name =
+        item.name ||
+        item.title ||
+        item.component ||
+        "";
+
+      if (!name) {
+        return null;
+      }
+
+      return {
+        name,
+        type:
+          item.type ||
+          defaultType,
+        category:
+          item.category ||
+          "General",
+        role:
+          item.role ||
+          item.purpose ||
+          item.responsibility ||
+          name,
+        reason:
+          item.reason ||
+          item.description ||
+          "Selected because it can contribute to the workspace.",
+        fit:
+          normalizeFit(item.fit),
+      };
+    })
+    .filter(Boolean);
+}
+
+
+// ============================================================
+// NORMALIZE LAYERS
+// ============================================================
+
+function normalizeLayers(
+  layers,
+  agents,
+  tools,
+  workflow,
+  goalUnderstanding
+) {
+  // ----------------------------------------------------------
+  // If the LLM supplied layers, preserve them.
+  // ----------------------------------------------------------
+
+  if (Array.isArray(layers) && layers.length > 0) {
+    return layers
+      .map((layer, index) => {
+        if (!layer || typeof layer !== "object") {
+          return null;
+        }
+
+        const name =
+          layer.name ||
+          layer.title ||
+          `Layer ${index + 1}`;
+
+        const components =
+          Array.isArray(layer.components)
+            ? layer.components
+                .map((component) => {
+                  if (
+                    typeof component === "string"
+                  ) {
+                    return {
+                      name: component,
+                      type: "Tool",
+                      role: "Workspace component",
+                      reason:
+                        "Used within this layer.",
+                    };
+                  }
+
+                  if (
+                    !component ||
+                    typeof component !== "object"
+                  ) {
+                    return null;
+                  }
+
+                  return {
+                    name:
+                      component.name ||
+                      component.component ||
+                      "Component",
+                    type:
+                      component.type ||
+                      "Tool",
+                    role:
+                      component.role ||
+                      component.purpose ||
+                      "",
+                    reason:
+                      component.reason ||
+                      "",
+                  };
+                })
+                .filter(Boolean)
+            : [];
+
+        return {
+          name,
+          purpose:
+            layer.purpose ||
+            layer.description ||
+            "Functional layer of the autonomous workspace.",
+          order:
+            Number.isFinite(Number(layer.order))
+              ? Number(layer.order)
+              : index + 1,
+          components,
+          inputs:
+            Array.isArray(layer.inputs)
+              ? layer.inputs
+              : [],
+          outputs:
+            Array.isArray(layer.outputs)
+              ? layer.outputs
+              : [],
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.order - b.order);
+  }
+
+  // ----------------------------------------------------------
+  // FALLBACK:
+  // Dynamically construct layers from the architecture.
+  //
+  // This is NOT a fixed five-layer architecture.
+  // It derives layers from the actual components/workflow.
+  // ----------------------------------------------------------
+
+  const generated = [];
+
+  const agentList = Array.isArray(agents)
+    ? agents
+    : [];
+
+  const toolList = Array.isArray(tools)
+    ? tools
+    : [];
+
+  const workflowList = Array.isArray(workflow)
+    ? workflow
+    : [];
+
+  // Group agents/tools by their apparent responsibilities.
+
+  const groups = [];
+
+  const addGroup = (
+    name,
+    purpose,
+    componentNames
+  ) => {
+    const uniqueNames = [
+      ...new Set(
+        componentNames.filter(Boolean)
+      ),
+    ];
+
+    if (uniqueNames.length === 0) {
+      return;
+    }
+
+    groups.push({
+      name,
+      purpose,
+      componentNames: uniqueNames,
+    });
+  };
+
+  // ----------------------------------------------------------
+  // Discovery / input
+  // ----------------------------------------------------------
+
+  const discovery = [
+    ...agentList
+      .filter((x) =>
+        /discover|research|search|collect|scan|browse|gather|source/i.test(
+          `${x.name} ${x.role}`
+        )
+      )
+      .map((x) => x.name),
+
+    ...toolList
+      .filter((x) =>
+        /search|browser|research|crawl|scrape|discover|retrieve|source/i.test(
+          `${x.name} ${x.role}`
+        )
+      )
+      .map((x) => x.name),
+  ];
+
+  addGroup(
+    "Discovery",
+    "Collects the information, inputs, sources, or signals required by the workspace.",
+    discovery
+  );
+
+  // ----------------------------------------------------------
+  // Processing / reasoning
+  // ----------------------------------------------------------
+
+  const reasoning = [
+    ...agentList
+      .filter((x) =>
+        /analys|reason|research|decision|evaluate|compare|code|plan|orchestrat/i.test(
+          `${x.name} ${x.role}`
+        )
+      )
+      .map((x) => x.name),
+
+    ...toolList
+      .filter((x) =>
+        /llm|model|reason|analysis|processing|orchestrat/i.test(
+          `${x.name} ${x.role}`
+        )
+      )
+      .map((x) => x.name),
+  ];
+
+  addGroup(
+    "Reasoning & Processing",
+    "Processes information, performs reasoning, evaluation, planning, or decision-making.",
+    reasoning
+  );
+
+  // ----------------------------------------------------------
+  // Memory / storage
+  // ----------------------------------------------------------
+
+  const memory = [
+    ...toolList
+      .filter((x) =>
+        /memory|database|storage|knowledge|vector|store|retrieval/i.test(
+          `${x.name} ${x.category} ${x.role}`
+        )
+      )
+      .map((x) => x.name),
+
+    ...agentList
+      .filter((x) =>
+        /memory|knowledge/i.test(
+          `${x.name} ${x.role}`
+        )
+      )
+      .map((x) => x.name),
+  ];
+
+  addGroup(
+    "Memory & Knowledge",
+    "Stores and retrieves information needed for persistent autonomous operation.",
+    memory
+  );
+
+  // ----------------------------------------------------------
+  // Execution / automation
+  // ----------------------------------------------------------
+
+  const execution = [
+    ...agentList
+      .filter((x) =>
+        /automation|execute|operation|action|browser|workflow|agent/i.test(
+          `${x.name} ${x.role}`
+        )
+      )
+      .map((x) => x.name),
+
+    ...toolList
+      .filter((x) =>
+        /automation|execution|integration|workflow|orchestration|browser|api/i.test(
+          `${x.name} ${x.category} ${x.role}`
+        )
+      )
+      .map((x) => x.name),
+  ];
+
+  addGroup(
+    "Execution & Automation",
+    "Carries out actions, integrations, workflows, and autonomous execution.",
+    execution
+  );
+
+  // ----------------------------------------------------------
+  // Output / delivery
+  // ----------------------------------------------------------
+
+  const delivery = [
+    ...agentList
+      .filter((x) =>
+        /report|writer|content|communication|support|marketing|sales|deliver/i.test(
+          `${x.name} ${x.role}`
+        )
+      )
+      .map((x) => x.name),
+
+    ...toolList
+      .filter((x) =>
+        /communication|notification|email|report|delivery|publish|productivity/i.test(
+          `${x.name} ${x.category} ${x.role}`
+        )
+      )
+      .map((x) => x.name),
+  ];
+
+  addGroup(
+    "Output & Delivery",
+    "Transforms completed work into useful outputs and delivers them to the intended destination.",
+    delivery
+  );
+
+  // ----------------------------------------------------------
+  // Monitoring / recovery
+  // ----------------------------------------------------------
+
+  const monitoring = [
+    ...agentList
+      .filter((x) =>
+        /monitor|quality|critic|review|supervis|control/i.test(
+          `${x.name} ${x.role}`
+        )
+      )
+      .map((x) => x.name),
+
+    ...toolList
+      .filter((x) =>
+        /monitor|logging|observability|quality|alert|notification/i.test(
+          `${x.name} ${x.category} ${x.role}`
+        )
+      )
+      .map((x) => x.name),
+  ];
+
+  addGroup(
+    "Monitoring & Recovery",
+    "Checks workspace performance, detects failures, and supports recovery or quality control.",
+    monitoring
+  );
+
+  // ----------------------------------------------------------
+  // If no semantic groups were possible, derive layers from
+  // the actual workflow.
+  // ----------------------------------------------------------
+
+  if (
+    groups.length === 0 &&
+    workflowList.length > 0
+  ) {
+    for (
+      let i = 0;
+      i < workflowList.length;
+      i++
+    ) {
+      const step = workflowList[i];
+
+      if (!step) {
+        continue;
+      }
+
+      const component =
+        typeof step === "string"
+          ? step
+          : step.component ||
+            step.name ||
+            `Step ${i + 1}`;
+
+      addGroup(
+        `Workflow Step ${i + 1}`,
+        typeof step === "object"
+          ? step.action ||
+            step.reason ||
+            "Functional workflow stage."
+          : "Functional workflow stage.",
+        [component]
+      );
+    }
+  }
+
+  // ----------------------------------------------------------
+  // Absolute final fallback.
+  // ----------------------------------------------------------
+
+  if (groups.length === 0) {
+    const allComponents = [
+      ...agentList.map((x) => x.name),
+      ...toolList.map((x) => x.name),
+    ];
+
+    if (allComponents.length > 0) {
+      addGroup(
+        "Core Workspace",
+        goalUnderstanding ||
+          "Core functional architecture for the requested workspace.",
+        allComponents
+      );
+    }
+  }
+
+  // ----------------------------------------------------------
+  // Convert groups into frontend layer objects.
+  // ----------------------------------------------------------
+
+  for (let i = 0; i < groups.length; i++) {
+    const group = groups[i];
+
+    const components = group.componentNames.map(
+      (name) => {
+        const agent = agentList.find(
+          (x) => x.name === name
+        );
+
+        if (agent) {
+          return {
+            name: agent.name,
+            type: "Agent",
+            role: agent.role,
+            reason: agent.reason,
+          };
+        }
+
+        const tool = toolList.find(
+          (x) => x.name === name
+        );
+
+        if (tool) {
+          return {
+            name: tool.name,
+            type: "Tool",
+            role: tool.role,
+            reason: tool.reason,
+          };
+        }
+
+        return {
+          name,
+          type: "Tool",
+          role: "Workspace component",
+          reason:
+            "Included as part of this functional layer.",
+        };
+      }
+    );
+
+    generated.push({
+      name: group.name,
+      purpose: group.purpose,
+      order: i + 1,
+      components,
+      inputs:
+        i === 0
+          ? ["User goal or incoming information"]
+          : [
+              `Output from ${generated[i - 1]?.name || "previous layer"}`,
+            ],
+      outputs: [
+        i < groups.length - 1
+          ? `Input for ${groups[i + 1]?.name || "next layer"}`
+          : "Final workspace output",
+      ],
+    });
+  }
+
+  return generated;
+}
+
+
+// ============================================================
+// NORMALIZE WORKFLOW
+// ============================================================
+
+function normalizeWorkflow(
+  workflow,
+  layers
+) {
+  if (
+    Array.isArray(workflow) &&
+    workflow.length > 0
+  ) {
+    return workflow.map((step, index) => {
+      if (typeof step === "string") {
+        return {
+          step: index + 1,
+          component: step,
+          action: step,
+          reason:
+            "Part of the autonomous workflow.",
+        };
+      }
+
+      if (!step || typeof step !== "object") {
+        return {
+          step: index + 1,
+          component: "Workspace",
+          action: "Execute workflow stage.",
+          reason: "",
+        };
+      }
+
+      return {
+        step:
+          Number(step.step) || index + 1,
+        component:
+          step.component ||
+          step.name ||
+          "Workspace",
+        action:
+          step.action ||
+          step.description ||
+          "Execute workflow stage.",
+        reason:
+          step.reason ||
+          "",
+      };
+    });
+  }
+
+  // Generate workflow from layers if LLM did not provide one.
+  return (layers || []).map(
+    (layer, index) => ({
+      step: index + 1,
+      component: layer.name,
+      action: layer.purpose,
+      reason:
+        `This layer performs the ${layer.name.toLowerCase()} function of the workspace.`,
+    })
+  );
+}
+
+
+// ============================================================
+// NORMALIZE RECOMMENDATIONS
+// ============================================================
+
+function normalizeRecommendations(
+  recommendations
+) {
+  if (!Array.isArray(recommendations)) {
+    return [];
+  }
+
+  return recommendations
+    .map((item) => {
+      if (typeof item === "string") {
+        const cleaned = item.trim();
+
+        if (
+          !cleaned ||
+          /^recommended capability$/i.test(
+            cleaned
+          )
+        ) {
+          return null;
+        }
+
+        return {
+          name: cleaned,
+          reason:
+            "This capability may improve the workspace.",
+          priority: "Medium",
+        };
+      }
+
+      if (!item || typeof item !== "object") {
+        return null;
+      }
+
+      const name =
+        item.name ||
+        item.capability ||
+        item.title ||
+        "";
+
+      if (!name) {
+        return null;
+      }
+
+      return {
+        name,
+        reason:
+          item.reason ||
+          item.description ||
+          item.explanation ||
+          "This recommendation may improve the workspace.",
+        priority:
+          normalizePriority(
+            item.priority
+          ),
+      };
+    })
+    .filter(Boolean);
+}
+
+
+// ============================================================
+// NORMALIZE EXTERNAL RECOMMENDATIONS
+// ============================================================
+
+function normalizeExternalRecommendations(
+  recommendations
+) {
+  if (!Array.isArray(recommendations)) {
+    return [];
+  }
+
+  return recommendations
+    .map((item) => {
+      if (typeof item === "string") {
+        const cleaned = item.trim();
+
+        if (!cleaned) {
+          return null;
+        }
+
+        return {
+          name: cleaned,
+          type: "Other",
+          reason:
+            "Potential external component identified for the workspace.",
+          use_for:
+            "Potentially useful workspace capability.",
+        };
+      }
+
+      if (!item || typeof item !== "object") {
+        return null;
+      }
+
+      const name =
+        item.name ||
+        item.product ||
+        item.tool ||
+        item.capability ||
+        "";
+
+      if (!name) {
+        return null;
+      }
+
+      return {
+        name,
+        type:
+          item.type ||
+          "Other",
+        reason:
+          item.reason ||
+          item.description ||
+          "Potential external component identified for the workspace.",
+        use_for:
+          item.use_for ||
+          item.role ||
+          item.purpose ||
+          "Potentially useful workspace capability.",
+      };
+    })
+    .filter(Boolean);
+}
+
+
+// ============================================================
+// NORMALIZE FIT
+// ============================================================
+
+function normalizeFit(value) {
+  const valueString =
+    String(value || "").toLowerCase();
+
+  if (valueString === "high") {
+    return "High";
+  }
+
+  if (valueString === "low") {
+    return "Low";
+  }
+
+  return "Medium";
+}
+
+
+// ============================================================
+// NORMALIZE PRIORITY
+// ============================================================
+
+function normalizePriority(value) {
+  const valueString =
+    String(value || "").toLowerCase();
+
+  if (valueString === "high") {
+    return "High";
+  }
+
+  if (valueString === "low") {
+    return "Low";
+  }
+
+  return "Medium";
+}
+
+
+// ============================================================
+// ARCHITECTURE SUMMARY FALLBACK
+// ============================================================
+
+function buildArchitectureSummary(
+  layers,
+  agents,
+  tools
+) {
+  const layerCount =
+    Array.isArray(layers)
+      ? layers.length
+      : 0;
+
+  const agentCount =
+    Array.isArray(agents)
+      ? agents.length
+      : 0;
+
+  const toolCount =
+    Array.isArray(tools)
+      ? tools.length
+      : 0;
+
+  if (layerCount === 0) {
+    return `The workspace uses ${agentCount} agents and ${toolCount} tools.`;
+  }
+
+  const layerNames = layers
+    .map((layer) => layer.name)
+    .filter(Boolean)
+    .join(", ");
+
+  return (
+    `The workspace uses ${agentCount} agents and ` +
+    `${toolCount} tools organized across ${layerCount} ` +
+    `dynamically designed layers: ${layerNames}.`
+  );
+}
+
+
+// ============================================================
+// JSON RESPONSE
+// ============================================================
+
+function jsonResponse(
+  data,
+  status,
+  corsHeaders
+) {
+  return new Response(
+    JSON.stringify(data, null, 2),
+    {
+      status,
+      headers: {
+        ...corsHeaders,
+        "Content-Type":
+          "application/json",
+      },
+    }
+  );
 }
