@@ -1,1041 +1,1037 @@
 export default {
   async fetch(request, env) {
+    const url = new URL(request.url);
+
+    // ------------------------------------------------------------
+    // CORS
+    // ------------------------------------------------------------
     const corsHeaders = {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Content-Type": "application/json; charset=utf-8"
     };
 
     if (request.method === "OPTIONS") {
       return new Response(null, {
         status: 204,
-        headers: corsHeaders,
+        headers: corsHeaders
       });
     }
 
-    if (!["GET", "POST"].includes(request.method)) {
-      return new Response(
-        JSON.stringify({
-          error: "Method not allowed.",
-        }),
+    // ------------------------------------------------------------
+    // GET
+    // Public Airtable directory endpoint
+    // Used by Agents / Tools pages.
+    // ------------------------------------------------------------
+    if (request.method === "GET") {
+      return await handleDirectoryRequest(env, corsHeaders);
+    }
+
+    // ------------------------------------------------------------
+    // POST /build-stack
+    // Build My Stack is COMPLETELY INDEPENDENT of Airtable.
+    // It uses OpenRouter free models to discover suitable
+    // agents/tools/services dynamically.
+    // ------------------------------------------------------------
+    if (request.method === "POST" && url.pathname === "/build-stack") {
+      return await handleBuildStack(request, env, corsHeaders);
+    }
+
+    return jsonResponse(
+      {
+        error: "Not found",
+        message: "Use GET for the directory or POST /build-stack for workspace generation."
+      },
+      404,
+      corsHeaders
+    );
+  }
+};
+
+
+// ================================================================
+// DIRECTORY
+// ================================================================
+
+async function handleDirectoryRequest(env, corsHeaders) {
+  try {
+    const airtableToken = env.AIRTABLE_TOKEN;
+    const baseId = env.AIRTABLE_BASE_ID;
+    const tableName = env.AIRTABLE_TABLE_NAME;
+
+    if (!airtableToken || !baseId || !tableName) {
+      return jsonResponse(
         {
-          status: 405,
-          headers: {
-            ...corsHeaders,
-            "Content-Type": "application/json",
-          },
-        }
+          error: "Airtable configuration is missing."
+        },
+        500,
+        corsHeaders
       );
     }
+
+    const endpoint =
+      `https://api.airtable.com/v0/${encodeURIComponent(baseId)}/${encodeURIComponent(tableName)}` +
+      `?pageSize=100`;
+
+    const response = await fetch(endpoint, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${airtableToken}`,
+        "Content-Type": "application/json"
+      }
+    });
+
+    const text = await response.text();
+
+    if (!response.ok) {
+      return jsonResponse(
+        {
+          error: "Airtable request failed.",
+          status: response.status,
+          details: safeErrorText(text)
+        },
+        502,
+        corsHeaders
+      );
+    }
+
+    let data;
 
     try {
-      /*
-      ==========================================================
-      GET
-      ----------------------------------------------------------
-      Keeps the public Airtable directory endpoint working.
-      Stack Builder does NOT use Airtable.
-      ==========================================================
-      */
-
-      if (request.method === "GET") {
-        const BASE_ID = "appY6TPhOsmj3dIX8";
-        const TABLE_NAME = "Table 1";
-
-        const airtableUrl =
-          `https://api.airtable.com/v0/${BASE_ID}/${encodeURIComponent(
-            TABLE_NAME
-          )}?maxRecords=100`;
-
-        const response = await fetch(airtableUrl, {
-          headers: {
-            Authorization: `Bearer ${env.AIRTABLE_TOKEN}`,
-            "Content-Type": "application/json",
-          },
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-
-          return new Response(
-            JSON.stringify({
-              error: "Airtable request failed.",
-              status: response.status,
-              details: errorText.slice(0, 2000),
-            }),
-            {
-              status: 502,
-              headers: {
-                ...corsHeaders,
-                "Content-Type": "application/json",
-              },
-            }
-          );
-        }
-
-        const data = await response.json();
-
-        const items = Array.isArray(data.records)
-          ? data.records.map((record) => ({
-              id: record.id,
-              Name: record.fields?.Name || "Untitled",
-              Type: record.fields?.Type || "Unknown",
-              Description: record.fields?.Description || "",
-              URL: record.fields?.URL || "",
-              Category: record.fields?.Category || "Uncategorized",
-              created: record.createdTime,
-            }))
-          : [];
-
-        return new Response(JSON.stringify(items, null, 2), {
-          headers: {
-            ...corsHeaders,
-            "Content-Type": "application/json",
-            "Cache-Control": "public, max-age=300",
-          },
-        });
-      }
-
-      /*
-      ==========================================================
-      POST /build-stack
-      ==========================================================
-      */
-
-      const url = new URL(request.url);
-
-      if (url.pathname !== "/build-stack") {
-        return new Response(
-          JSON.stringify({
-            error: "Unknown endpoint.",
-          }),
-          {
-            status: 404,
-            headers: {
-              ...corsHeaders,
-              "Content-Type": "application/json",
-            },
-          }
-        );
-      }
-
-      /*
-      ==========================================================
-      OPENROUTER KEY
-      ==========================================================
-      */
-
-      if (!env.OPENROUTER_KEY) {
-        return new Response(
-          JSON.stringify({
-            error: "OPENROUTER_KEY is not configured.",
-          }),
-          {
-            status: 500,
-            headers: {
-              ...corsHeaders,
-              "Content-Type": "application/json",
-            },
-          }
-        );
-      }
-
-      /*
-      ==========================================================
-      READ USER GOAL
-      ==========================================================
-      */
-
-      let body;
-
-      try {
-        body = await request.json();
-      } catch {
-        return new Response(
-          JSON.stringify({
-            error: "Request body must contain valid JSON.",
-          }),
-          {
-            status: 400,
-            headers: {
-              ...corsHeaders,
-              "Content-Type": "application/json",
-            },
-          }
-        );
-      }
-
-      const goal = String(body?.goal || "").trim();
-
-      if (!goal) {
-        return new Response(
-          JSON.stringify({
-            error: "A workspace goal is required.",
-          }),
-          {
-            status: 400,
-            headers: {
-              ...corsHeaders,
-              "Content-Type": "application/json",
-            },
-          }
-        );
-      }
-
-      /*
-      ==========================================================
-      SYSTEM PROMPT
-      ==========================================================
-
-      IMPORTANT:
-      Airtable is intentionally NOT supplied to the model.
-
-      The model must independently determine what the workspace
-      needs and discover appropriate real agents/tools from its
-      own knowledge.
-      ==========================================================
-      */
-
-      const systemPrompt = `
-You are the autonomous workspace architect for Autonomous Work Space.
-
-Your job is to transform a user's real-world objective into a
-practical autonomous workspace architecture.
-
-IMPORTANT RULES:
-
-1. The user's goal is the only starting input.
-2. Do NOT use Airtable.
-3. Do NOT assume a predefined directory.
-4. Do NOT assume a fixed number of workspace layers.
-5. Determine the capabilities required by the goal first.
-6. Then identify real agents, tools, platforms, services, or
-   open-source projects that could provide those capabilities.
-7. Prefer genuinely free, open-source, or free-tier options when
-   practical because this project is designed around zero-cost
-   infrastructure.
-8. Paid products may be mentioned when they are genuinely useful,
-   but clearly mark them as paid.
-9. Never invent a product, company, project, URL, capability,
-   integration, or feature.
-10. If you are not confident about a URL, return an empty string.
-11. Do not force an agent or tool into the architecture merely
-    because it is well known.
-12. Each selected component must have a specific reason for being
-    included.
-13. The architecture must be derived from the user's goal.
-14. Identify important capability gaps where no suitable component
-    is available.
-15. Critically review the resulting architecture.
-16. Return ONLY valid JSON.
-17. Do not use markdown fences.
-18. Do not put commentary before or after the JSON.
-
-The workspace can contain agents, tools, services, infrastructure,
-memory systems, communication systems, databases, automation
-systems, browsers, coding systems, research systems, or other
-components when genuinely required.
-
-The architecture should be practical rather than theoretical.
-`;
-
-      /*
-      ==========================================================
-      USER PROMPT
-      ==========================================================
-      */
-
-      const userPrompt = `
-USER WORKSPACE GOAL:
-
-${goal}
-
-Analyze this goal from the ground up.
-
-First determine:
-
-- What the user is actually trying to accomplish.
-- Which capabilities are required.
-- Which work stages are required.
-- Which agents and tools could provide those capabilities.
-- How those components should be organized.
-- What important capabilities remain unsatisfied.
-
-Do NOT assume that the answer must contain a fixed number of
-layers.
-
-Return exactly this JSON structure:
-
-{
-  "goal_summary": "Clear interpretation of the user's objective.",
-
-  "core_capabilities": [
-    {
-      "name": "Capability name",
-      "reason": "Why this capability is required."
-    }
-  ],
-
-  "discovered_components": [
-    {
-      "name": "Exact real product, project, agent, service or tool name",
-      "type": "Agent or Tool",
-      "category": "Relevant category",
-      "url": "Real URL if confidently known, otherwise empty string",
-      "availability": "free, free tier, open source, paid, or unknown",
-      "reason": "Why this component is relevant."
-    }
-  ],
-
-  "layers": [
-    {
-      "number": 1,
-      "name": "Layer name",
-      "purpose": "What this layer does.",
-      "why_needed": "Why this layer is required.",
-      "agents": [
+      data = JSON.parse(text);
+    } catch {
+      return jsonResponse(
         {
-          "name": "Exact component name",
-          "reason": "Why this agent belongs here."
-        }
-      ],
-      "tools": [
-        {
-          "name": "Exact component name",
-          "reason": "Why this tool belongs here."
-        }
-      ]
+          error: "Airtable returned invalid JSON."
+        },
+        502,
+        corsHeaders
+      );
     }
-  ],
 
-  "gaps": [
-    {
-      "capability": "Missing capability",
-      "reason": "Why the workspace cannot fully satisfy it."
-    }
-  ],
+    const records = Array.isArray(data.records)
+      ? data.records
+      : [];
 
-  "recommendations": [
-    {
-      "name": "Real product/project/service name",
-      "capability": "Capability it could provide",
-      "url": "Real URL if confidently known, otherwise empty string",
-      "reason": "Why it is worth considering."
-    }
-  ],
+    const items = records.map(record => {
+      const fields = record.fields || {};
 
-  "review": {
-    "summary": "Critical assessment of the generated workspace.",
-    "improvements": [
-      "Specific improvement or limitation."
-    ]
-  },
+      return {
+        id: record.id || null,
+        name: cleanString(fields.Name),
+        type: cleanString(fields.Type),
+        category: cleanString(fields.Category),
+        description: cleanString(fields.Description),
+        url: cleanString(fields.URL)
+      };
+    });
 
-  "architecture_summary": "Explain how the complete workspace works from input to final outcome."
+    return jsonResponse(
+      {
+        records: items,
+        count: items.length
+      },
+      200,
+      corsHeaders
+    );
+
+  } catch (error) {
+    return jsonResponse(
+      {
+        error: "Directory request failed.",
+        details: error?.message || String(error)
+      },
+      500,
+      corsHeaders
+    );
+  }
 }
 
-QUALITY REQUIREMENTS:
 
-- Use only real components.
-- Do not invent URLs.
-- Do not invent integrations.
-- Do not blindly recommend popular AI products.
-- Avoid unnecessary components.
-- Prefer free/open-source/free-tier options where appropriate.
-- Distinguish between agents and tools.
-- Build only the layers actually required by the goal.
-- Make the reasons specific to this user's goal.
-- Identify genuine gaps rather than pretending everything is solved.
-- The final architecture should describe an actual autonomous work
-  system, not merely a list of products.
-`;
+// ================================================================
+// BUILD STACK
+// ================================================================
 
-      /*
-      ==========================================================
-      FREE MODEL DISCOVERY
-      ==========================================================
+async function handleBuildStack(request, env, corsHeaders) {
+  const startedAt = Date.now();
 
-      We still discover currently available free models, but we
-      do NOT individually hammer them.
-
-      OpenRouter's openrouter/free router remains the primary route.
-      ==========================================================
-      */
-
-      async function getFreeModels() {
-        try {
-          const response = await fetch(
-            "https://openrouter.ai/api/v1/models",
-            {
-              headers: {
-                Authorization: `Bearer ${env.OPENROUTER_KEY}`,
-              },
-            }
-          );
-
-          if (!response.ok) {
-            return [];
-          }
-
-          const data = await response.json();
-
-          if (!Array.isArray(data?.data)) {
-            return [];
-          }
-
-          const freeModels = data.data
-            .filter((model) => {
-              const id = String(model?.id || "");
-
-              if (!id) {
-                return false;
-              }
-
-              /*
-              Explicit :free variants.
-              */
-              if (id.endsWith(":free")) {
-                return true;
-              }
-
-              /*
-              Some models expose zero pricing directly.
-              */
-              const promptPrice = Number(
-                model?.pricing?.prompt ?? NaN
-              );
-
-              const completionPrice = Number(
-                model?.pricing?.completion ?? NaN
-              );
-
-              return (
-                Number.isFinite(promptPrice) &&
-                Number.isFinite(completionPrice) &&
-                promptPrice === 0 &&
-                completionPrice === 0
-              );
-            })
-            .map((model) => String(model.id))
-            .filter(Boolean);
-
-          return [...new Set(freeModels)];
-        } catch {
-          return [];
-        }
-      }
-
-      const discoveredFreeModels = await getFreeModels();
-
-      /*
-      ==========================================================
-      MODEL FALLBACK LIST
-      ==========================================================
-
-      openrouter/free is first.
-
-      We then provide real free variants as fallbacks.
-
-      We deliberately limit the list because failed requests can
-      count against the free allowance.
-      ==========================================================
-      */
-
-      const modelCandidates = [
-        "openrouter/free",
-        ...discoveredFreeModels,
-      ];
-
-      const uniqueModels = [
-        ...new Set(
-          modelCandidates
-            .map((model) => String(model || "").trim())
-            .filter(Boolean)
-        ),
-      ];
-
-      /*
-      Maximum fallback models in ONE OpenRouter request.
-      This is model fallback, not sequential API calls.
-      */
-
-      const fallbackModels = uniqueModels.slice(0, 10);
-
-      /*
-      ==========================================================
-      OPENROUTER REQUEST
-      ==========================================================
-
-      OpenRouter can automatically fall back between models using
-      the "models" array.
-
-      This is much better than making 8 separate API requests.
-      ==========================================================
-      */
-
-      const requestBody = {
-        model: "openrouter/free",
-
-        /*
-        OpenRouter automatic model fallback.
-        */
-        models: fallbackModels,
-
-        messages: [
-          {
-            role: "system",
-            content: systemPrompt,
-          },
-          {
-            role: "user",
-            content: userPrompt,
-          },
-        ],
-
-        temperature: 0.15,
-
-        /*
-        6000 is more than enough for the requested architecture
-        while being substantially safer for free models.
-        */
-        max_tokens: 6000,
-
-        /*
-        Ask for JSON directly.
-
-        openrouter/free filters for models supporting structured
-        output capabilities.
-        */
-        response_format: {
-          type: "json_object",
+  try {
+    if (!env.OPENROUTER_KEY) {
+      return jsonResponse(
+        {
+          error: "OpenRouter is not configured.",
+          message: "The OPENROUTER_KEY secret is missing from the Worker."
         },
-      };
-
-      let response;
-
-      try {
-        response = await fetch(
-          "https://openrouter.ai/api/v1/chat/completions",
-          {
-            method: "POST",
-
-            headers: {
-              Authorization: `Bearer ${env.OPENROUTER_KEY}`,
-              "Content-Type": "application/json",
-
-              "HTTP-Referer":
-                "https://autonomouswork.space",
-
-              "X-Title":
-                "Autonomous Work Space",
-            },
-
-            body: JSON.stringify(requestBody),
-          }
-        );
-      } catch (error) {
-        return new Response(
-          JSON.stringify(
-            {
-              error:
-                "Unable to connect to OpenRouter.",
-              details:
-                error?.message ||
-                "Network request failed.",
-            },
-            null,
-            2
-          ),
-          {
-            status: 502,
-            headers: {
-              ...corsHeaders,
-              "Content-Type": "application/json",
-            },
-          }
-        );
-      }
-
-      /*
-      ==========================================================
-      READ OPENROUTER RESPONSE
-      ==========================================================
-      */
-
-      const responseText = await response.text();
-
-      let data = null;
-
-      try {
-        data = JSON.parse(responseText);
-      } catch {
-        data = null;
-      }
-
-      /*
-      ==========================================================
-      HANDLE OPENROUTER ERRORS
-      ==========================================================
-      */
-
-      if (!response.ok) {
-        const providerError =
-          data?.error?.message ||
-          data?.error?.metadata?.raw ||
-          responseText.slice(0, 3000);
-
-        return new Response(
-          JSON.stringify(
-            {
-              error:
-                "OpenRouter could not build the workspace.",
-
-              status:
-                response.status,
-
-              openrouter_error:
-                providerError,
-
-              models_attempted:
-                fallbackModels,
-
-              hint:
-                response.status === 429
-                  ? "OpenRouter free-model rate limit reached. Wait and try again."
-                  : response.status === 401
-                  ? "The OPENROUTER_KEY is invalid or unavailable to the Worker."
-                  : response.status === 402
-                  ? "OpenRouter rejected the request because the account has no available inference allowance."
-                  : response.status === 404
-                  ? "The selected free model route is unavailable."
-                  : "The free-model route rejected the request."
-            },
-            null,
-            2
-          ),
-          {
-            status: 502,
-            headers: {
-              ...corsHeaders,
-              "Content-Type": "application/json",
-            },
-          }
-        );
-      }
-
-      /*
-      ==========================================================
-      EXTRACT MODEL CONTENT
-      ==========================================================
-      */
-
-      let content =
-        data?.choices?.[0]?.message?.content;
-
-      /*
-      Some OpenRouter responses can return content blocks.
-      */
-
-      if (Array.isArray(content)) {
-        content = content
-          .map((part) => {
-            if (typeof part === "string") {
-              return part;
-            }
-
-            if (
-              part &&
-              typeof part.text === "string"
-            ) {
-              return part.text;
-            }
-
-            return "";
-          })
-          .join("");
-      }
-
-      content = String(content || "").trim();
-
-      if (!content) {
-        return new Response(
-          JSON.stringify(
-            {
-              error:
-                "OpenRouter returned no workspace content.",
-
-              model:
-                data?.model ||
-                "unknown",
-
-              raw_response:
-                responseText.slice(0, 4000),
-            },
-            null,
-            2
-          ),
-          {
-            status: 502,
-            headers: {
-              ...corsHeaders,
-              "Content-Type": "application/json",
-            },
-          }
-        );
-      }
-
-      /*
-      ==========================================================
-      PARSE ARCHITECTURE JSON
-      ==========================================================
-      */
-
-      let architecture;
-
-      try {
-        architecture = JSON.parse(content);
-      } catch {
-        /*
-        Defensive recovery if a model still surrounds JSON
-        with unexpected text.
-        */
-
-        const firstBrace =
-          content.indexOf("{");
-
-        const lastBrace =
-          content.lastIndexOf("}");
-
-        if (
-          firstBrace === -1 ||
-          lastBrace === -1 ||
-          lastBrace <= firstBrace
-        ) {
-          return new Response(
-            JSON.stringify(
-              {
-                error:
-                  "The reasoning model returned invalid workspace JSON.",
-
-                model:
-                  data?.model ||
-                  "unknown",
-
-                raw_content:
-                  content.slice(0, 5000),
-              },
-              null,
-              2
-            ),
-            {
-              status: 502,
-              headers: {
-                ...corsHeaders,
-                "Content-Type": "application/json",
-              },
-            }
-          );
-        }
-
-        try {
-          architecture = JSON.parse(
-            content.slice(
-              firstBrace,
-              lastBrace + 1
-            )
-          );
-        } catch {
-          return new Response(
-            JSON.stringify(
-              {
-                error:
-                  "The reasoning model returned malformed workspace JSON.",
-
-                model:
-                  data?.model ||
-                  "unknown",
-
-                raw_content:
-                  content.slice(0, 5000),
-              },
-              null,
-              2
-            ),
-            {
-              status: 502,
-              headers: {
-                ...corsHeaders,
-                "Content-Type": "application/json",
-              },
-            }
-          );
-        }
-      }
-
-      /*
-      ==========================================================
-      VALIDATE ARCHITECTURE
-      ==========================================================
-      */
-
-      if (
-        !architecture ||
-        typeof architecture !== "object" ||
-        Array.isArray(architecture)
-      ) {
-        return new Response(
-          JSON.stringify(
-            {
-              error:
-                "The reasoning model returned an invalid workspace architecture.",
-            },
-            null,
-            2
-          ),
-          {
-            status: 502,
-            headers: {
-              ...corsHeaders,
-              "Content-Type": "application/json",
-            },
-          }
-        );
-      }
-
-      /*
-      ==========================================================
-      NORMALIZE ARRAYS
-      ==========================================================
-      */
-
-      if (
-        !Array.isArray(
-          architecture.core_capabilities
-        )
-      ) {
-        architecture.core_capabilities = [];
-      }
-
-      if (
-        !Array.isArray(
-          architecture.discovered_components
-        )
-      ) {
-        architecture.discovered_components = [];
-      }
-
-      if (
-        !Array.isArray(
-          architecture.layers
-        )
-      ) {
-        architecture.layers = [];
-      }
-
-      if (
-        !Array.isArray(
-          architecture.gaps
-        )
-      ) {
-        architecture.gaps = [];
-      }
-
-      if (
-        !Array.isArray(
-          architecture.recommendations
-        )
-      ) {
-        architecture.recommendations = [];
-      }
-
-      /*
-      ==========================================================
-      NORMALIZE REVIEW
-      ==========================================================
-      */
-
-      if (
-        !architecture.review ||
-        typeof architecture.review !== "object" ||
-        Array.isArray(architecture.review)
-      ) {
-        architecture.review = {};
-      }
-
-      if (
-        typeof architecture.review.summary !==
-        "string"
-      ) {
-        architecture.review.summary = "";
-      }
-
-      if (
-        !Array.isArray(
-          architecture.review.improvements
-        )
-      ) {
-        architecture.review.improvements = [];
-      }
-
-      /*
-      ==========================================================
-      NORMALIZE TOP-LEVEL TEXT
-      ==========================================================
-      */
-
-      if (
-        typeof architecture.goal_summary !==
-        "string"
-      ) {
-        architecture.goal_summary = "";
-      }
-
-      if (
-        typeof architecture.architecture_summary !==
-        "string"
-      ) {
-        architecture.architecture_summary = "";
-      }
-
-      /*
-      ==========================================================
-      NORMALIZE DISCOVERED COMPONENTS
-      ==========================================================
-      */
-
-      architecture.discovered_components =
-        architecture.discovered_components
-          .filter(
-            (component) =>
-              component &&
-              typeof component === "object"
-          )
-          .map((component) => ({
-            name: String(
-              component.name || ""
-            ).trim(),
-
-            type:
-              String(
-                component.type || "Tool"
-              ).trim() === "Agent"
-                ? "Agent"
-                : "Tool",
-
-            category: String(
-              component.category || ""
-            ).trim(),
-
-            url: String(
-              component.url || ""
-            ).trim(),
-
-            availability: String(
-              component.availability ||
-                "unknown"
-            ).trim(),
-
-            reason: String(
-              component.reason || ""
-            ).trim(),
-          }))
-          .filter(
-            (component) =>
-              component.name
-          );
-
-      /*
-      ==========================================================
-      ADD DISCOVERY METADATA
-      ==========================================================
-      */
-
-      architecture.discovery_mode =
-        "openrouter_free_models";
-
-      architecture.airtable_used =
-        false;
-
-      /*
-      ==========================================================
-      RETURN SUCCESS
-      ==========================================================
-      */
-
-      return new Response(
-        JSON.stringify(
-          {
-            success: true,
-
-            architecture,
-
-            model_used:
-              data?.model ||
-              "openrouter/free",
-
-            model_attempts:
-              Array.isArray(
-                data?.choices
-              )
-                ? 1
-                : 1,
-
-            fallback_models:
-              fallbackModels,
-
-            discovery_mode:
-              "openrouter_free_models",
-
-            airtable_used:
-              false,
-          },
-          null,
-          2
-        ),
-        {
-          status: 200,
-
-          headers: {
-            ...corsHeaders,
-            "Content-Type":
-              "application/json",
-
-            "Cache-Control":
-              "no-store",
-          },
-        }
-      );
-    } catch (error) {
-      /*
-      ==========================================================
-      FINAL WORKER ERROR
-      ==========================================================
-      */
-
-      return new Response(
-        JSON.stringify(
-          {
-            error:
-              error?.message ||
-              "Unexpected Worker error.",
-
-            type:
-              error?.name ||
-              "WorkerError",
-          },
-          null,
-          2
-        ),
-        {
-          status: 500,
-
-          headers: {
-            ...corsHeaders,
-            "Content-Type":
-              "application/json",
-          },
-        }
+        500,
+        corsHeaders
       );
     }
-  },
-};
+
+    let body;
+
+    try {
+      body = await request.json();
+    } catch {
+      return jsonResponse(
+        {
+          error: "Invalid JSON request."
+        },
+        400,
+        corsHeaders
+      );
+    }
+
+    const goal = cleanString(body?.goal);
+
+    if (!goal) {
+      return jsonResponse(
+        {
+          error: "A workspace goal is required."
+        },
+        400,
+        corsHeaders
+      );
+    }
+
+    if (goal.length > 3000) {
+      return jsonResponse(
+        {
+          error: "Workspace goal is too long.",
+          message: "Please keep the goal under 3000 characters."
+        },
+        400,
+        corsHeaders
+      );
+    }
+
+    // ------------------------------------------------------------
+    // IMPORTANT:
+    // No Airtable data is loaded here.
+    // The stack builder works independently.
+    // ------------------------------------------------------------
+
+    const result = await buildWithFreeModels(goal, env.OPENROUTER_KEY);
+
+    if (!result.success) {
+      return jsonResponse(
+        {
+          error: "Workspace build failed.",
+          message: result.message,
+          openrouter_error: result.openrouter_error || null,
+          model_attempts: result.model_attempts || [],
+          discovery_mode: "openrouter_free_models",
+          elapsed_ms: Date.now() - startedAt
+        },
+        502,
+        corsHeaders
+      );
+    }
+
+    const workspace = normalizeWorkspace(
+      result.workspace,
+      goal
+    );
+
+    workspace.discovery_mode = "openrouter_free_models";
+    workspace.model_used = result.model_used || null;
+    workspace.model_attempts = result.model_attempts || [];
+    workspace.elapsed_ms = Date.now() - startedAt;
+
+    return jsonResponse(
+      workspace,
+      200,
+      corsHeaders
+    );
+
+  } catch (error) {
+    return jsonResponse(
+      {
+        error: "Workspace build failed.",
+        message: error?.message || String(error),
+        discovery_mode: "openrouter_free_models",
+        elapsed_ms: Date.now() - startedAt
+      },
+      500,
+      corsHeaders
+    );
+  }
+}
+
+
+// ================================================================
+// OPENROUTER FREE MODEL ENGINE
+// ================================================================
+
+async function buildWithFreeModels(goal, apiKey) {
+  const attempts = [];
+
+  // ------------------------------------------------------------
+  // FIRST:
+  // Use the official OpenRouter Free Models Router.
+  // ------------------------------------------------------------
+
+  const routerResult = await callOpenRouter(
+    "openrouter/free",
+    goal,
+    apiKey
+  );
+
+  attempts.push({
+    model: "openrouter/free",
+    status: routerResult.success ? "success" : "failed",
+    error: routerResult.success
+      ? null
+      : routerResult.error
+  });
+
+  if (routerResult.success) {
+    const parsed = parseWorkspaceResponse(routerResult.content);
+
+    if (parsed) {
+      return {
+        success: true,
+        workspace: parsed,
+        model_used: routerResult.model || "openrouter/free",
+        model_attempts: attempts
+      };
+    }
+
+    attempts[attempts.length - 1].status = "invalid_json";
+  }
+
+  // ------------------------------------------------------------
+  // SECOND:
+  // Fetch current free models from OpenRouter.
+  //
+  // This avoids relying on a hardcoded list that may become stale.
+  // ------------------------------------------------------------
+
+  const freeModelsResult = await getFreeModels(apiKey);
+
+  if (!freeModelsResult.success) {
+    return {
+      success: false,
+      message:
+        "OpenRouter Free Models Router failed and the current free-model list could not be retrieved.",
+      openrouter_error:
+        freeModelsResult.error ||
+        routerResult.error ||
+        "Unknown OpenRouter error.",
+      model_attempts: attempts
+    };
+  }
+
+  const models = freeModelsResult.models;
+
+  // ------------------------------------------------------------
+  // Try several current :free models.
+  // ------------------------------------------------------------
+
+  const maxIndividualAttempts = Math.min(
+    models.length,
+    8
+  );
+
+  for (let i = 0; i < maxIndividualAttempts; i++) {
+    const model = models[i];
+
+    if (!model || model === "openrouter/free") {
+      continue;
+    }
+
+    const result = await callOpenRouter(
+      model,
+      goal,
+      apiKey
+    );
+
+    attempts.push({
+      model,
+      status: result.success ? "success" : "failed",
+      error: result.success
+        ? null
+        : result.error
+    });
+
+    if (!result.success) {
+      continue;
+    }
+
+    const parsed = parseWorkspaceResponse(result.content);
+
+    if (!parsed) {
+      attempts[attempts.length - 1].status = "invalid_json";
+      continue;
+    }
+
+    return {
+      success: true,
+      workspace: parsed,
+      model_used: result.model || model,
+      model_attempts: attempts
+    };
+  }
+
+  return {
+    success: false,
+    message:
+      "All currently available free OpenRouter models failed to return a usable workspace.",
+    openrouter_error:
+      attempts.length
+        ? attempts[attempts.length - 1].error
+        : "No usable free model was available.",
+    model_attempts: attempts
+  };
+}
+
+
+// ================================================================
+// CALL OPENROUTER
+// ================================================================
+
+async function callOpenRouter(model, goal, apiKey) {
+  const endpoint =
+    "https://openrouter.ai/api/v1/chat/completions";
+
+  const systemPrompt = `
+You are the architecture engine for Autonomous Work Space.
+
+Your task is to design a practical autonomous-work system for the user's goal.
+
+You MUST independently discover suitable real-world AI agents, tools, platforms, services, open-source projects, or products.
+
+Do NOT use Airtable.
+Do NOT assume a fixed catalog.
+Do NOT say that you are limited to a directory.
+Do NOT invent products, companies, URLs, capabilities, or availability.
+
+Prefer free, open-source, self-hostable, or genuinely free options when appropriate.
+
+Return ONLY valid JSON.
+No markdown.
+No code fences.
+No explanation outside the JSON.
+
+The JSON must have exactly these top-level fields:
+
+{
+  "goal_summary": "short summary",
+  "core_capabilities": [],
+  "discovered_components": [],
+  "layers": [],
+  "gaps": [],
+  "recommendations": [],
+  "review": {},
+  "architecture_summary": "short practical explanation"
+}
+
+Each discovered_components item MUST have:
+
+{
+  "name": "",
+  "type": "Agent or Tool",
+  "category": "",
+  "url": "",
+  "availability": "Free, Freemium, Paid, Open Source, Unknown, or Other",
+  "reason": ""
+}
+
+Rules:
+
+1. Only recommend real products, projects, agents, tools, or services.
+2. Never fabricate a name or URL.
+3. Use the official website or official project URL when known.
+4. If you are not confident about a URL, use an empty string rather than inventing one.
+5. Do not force every category to have a component.
+6. Components must directly help accomplish the user's goal.
+7. Agents and tools may be from different companies/projects.
+8. Layers should describe the actual architecture needed for this goal.
+9. Identify meaningful capability gaps.
+10. Recommendations should explain practical next steps.
+11. The review should identify weaknesses, unnecessary components, and possible improvements.
+12. Keep the result concise enough to fit within the response limit.
+
+User goal:
+
+${goal}
+`;
+
+  const payload = {
+    model,
+    messages: [
+      {
+        role: "system",
+        content: systemPrompt
+      },
+      {
+        role: "user",
+        content:
+          "Build the autonomous workspace for this goal. Return only the requested JSON."
+      }
+    ],
+    max_tokens: 5000,
+    temperature: 0.2
+  };
+
+  try {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://autonomouswork.space",
+        "X-Title": "Autonomous Work Space"
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const rawText = await response.text();
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: extractOpenRouterError(
+          rawText,
+          response.status
+        )
+      };
+    }
+
+    let data;
+
+    try {
+      data = JSON.parse(rawText);
+    } catch {
+      return {
+        success: false,
+        error:
+          "OpenRouter returned a non-JSON HTTP response."
+      };
+    }
+
+    const content =
+      data?.choices?.[0]?.message?.content;
+
+    if (!content) {
+      return {
+        success: false,
+        error:
+          data?.error?.message ||
+          "OpenRouter returned no assistant content."
+      };
+    }
+
+    return {
+      success: true,
+      content,
+      model:
+        data?.model ||
+        model
+    };
+
+  } catch (error) {
+    return {
+      success: false,
+      error:
+        error?.message ||
+        String(error)
+    };
+  }
+}
+
+
+// ================================================================
+// GET CURRENT FREE MODELS
+// ================================================================
+
+async function getFreeModels(apiKey) {
+  try {
+    const response = await fetch(
+      "https://openrouter.ai/api/v1/models",
+      {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${apiKey}`
+        }
+      }
+    );
+
+    const text = await response.text();
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: extractOpenRouterError(
+          text,
+          response.status
+        ),
+        models: []
+      };
+    }
+
+    let data;
+
+    try {
+      data = JSON.parse(text);
+    } catch {
+      return {
+        success: false,
+        error: "Invalid response from OpenRouter Models API.",
+        models: []
+      };
+    }
+
+    const allModels =
+      Array.isArray(data?.data)
+        ? data.data
+        : [];
+
+    const freeModels = allModels
+      .filter(model => {
+        const id = cleanString(model?.id);
+
+        if (!id) {
+          return false;
+        }
+
+        if (id === "openrouter/free") {
+          return false;
+        }
+
+        // Explicit :free variant.
+        if (id.endsWith(":free")) {
+          return true;
+        }
+
+        // Some model listings expose zero pricing
+        // without a :free suffix.
+        const prompt =
+          parseFloat(model?.pricing?.prompt);
+
+        const completion =
+          parseFloat(model?.pricing?.completion);
+
+        return (
+          Number.isFinite(prompt) &&
+          Number.isFinite(completion) &&
+          prompt === 0 &&
+          completion === 0
+        );
+      })
+      .map(model => model.id)
+      .filter(Boolean);
+
+    // Remove duplicates while preserving order.
+    const uniqueModels = [
+      ...new Set(freeModels)
+    ];
+
+    return {
+      success: true,
+      models: uniqueModels
+    };
+
+  } catch (error) {
+    return {
+      success: false,
+      error:
+        error?.message ||
+        String(error),
+      models: []
+    };
+  }
+}
+
+
+// ================================================================
+// RESPONSE PARSER
+// ================================================================
+
+function parseWorkspaceResponse(content) {
+  if (!content) {
+    return null;
+  }
+
+  let text = String(content).trim();
+
+  // ------------------------------------------------------------
+  // Remove markdown fences if a model ignored the instruction.
+  // ------------------------------------------------------------
+
+  text = text
+    .replace(/^```json\s*/i, "")
+    .replace(/^```\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+
+  // ------------------------------------------------------------
+  // Direct JSON
+  // ------------------------------------------------------------
+
+  try {
+    const parsed = JSON.parse(text);
+
+    if (isUsableWorkspace(parsed)) {
+      return parsed;
+    }
+  } catch {
+    // Continue to repair attempt.
+  }
+
+  // ------------------------------------------------------------
+  // Extract the outermost JSON object.
+  // ------------------------------------------------------------
+
+  const firstBrace = text.indexOf("{");
+  const lastBrace = text.lastIndexOf("}");
+
+  if (
+    firstBrace !== -1 &&
+    lastBrace !== -1 &&
+    lastBrace > firstBrace
+  ) {
+    const candidate =
+      text.slice(
+        firstBrace,
+        lastBrace + 1
+      );
+
+    try {
+      const parsed = JSON.parse(candidate);
+
+      if (isUsableWorkspace(parsed)) {
+        return parsed;
+      }
+    } catch {
+      // Continue.
+    }
+  }
+
+  return null;
+}
+
+
+// ================================================================
+// WORKSPACE VALIDATION
+// ================================================================
+
+function isUsableWorkspace(value) {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const hasComponents =
+    Array.isArray(value.discovered_components);
+
+  const hasLayers =
+    Array.isArray(value.layers);
+
+  const hasGoal =
+    typeof value.goal_summary === "string";
+
+  return (
+    hasGoal &&
+    (hasComponents || hasLayers)
+  );
+}
+
+
+// ================================================================
+// NORMALIZATION
+// ================================================================
+
+function normalizeWorkspace(workspace, goal) {
+  const discovered =
+    Array.isArray(workspace?.discovered_components)
+      ? workspace.discovered_components
+      : [];
+
+  const components = discovered
+    .map(item => {
+      if (!item || typeof item !== "object") {
+        return null;
+      }
+
+      const type =
+        normalizeType(item.type);
+
+      return {
+        name: cleanString(item.name),
+        type,
+        category: cleanString(item.category),
+        url: normalizeUrl(item.url),
+        availability:
+          cleanString(item.availability) ||
+          "Unknown",
+        reason:
+          cleanString(item.reason)
+      };
+    })
+    .filter(item => item && item.name);
+
+  const layers =
+    Array.isArray(workspace?.layers)
+      ? workspace.layers.map((layer, index) => {
+          if (!layer || typeof layer !== "object") {
+            return {
+              name: `Layer ${index + 1}`,
+              purpose: "",
+              components: []
+            };
+          }
+
+          return {
+            name:
+              cleanString(layer.name) ||
+              `Layer ${index + 1}`,
+
+            purpose:
+              cleanString(
+                layer.purpose ||
+                layer.description
+              ),
+
+            components:
+              Array.isArray(layer.components)
+                ? layer.components
+                    .map(cleanString)
+                    .filter(Boolean)
+                : []
+          };
+        })
+      : [];
+
+  const agents =
+    components.filter(
+      item =>
+        item.type.toLowerCase() === "agent"
+    );
+
+  const tools =
+    components.filter(
+      item =>
+        item.type.toLowerCase() === "tool"
+    );
+
+  return {
+    goal: goal,
+
+    goal_summary:
+      cleanString(workspace?.goal_summary) ||
+      goal,
+
+    core_capabilities:
+      normalizeStringArray(
+        workspace?.core_capabilities
+      ),
+
+    discovered_components:
+      components,
+
+    agents,
+
+    tools,
+
+    layers,
+
+    gaps:
+      normalizeStringArray(
+        workspace?.gaps
+      ),
+
+    recommendations:
+      normalizeStringArray(
+        workspace?.recommendations
+      ),
+
+    review:
+      normalizeReview(
+        workspace?.review
+      ),
+
+    architecture_summary:
+      cleanString(
+        workspace?.architecture_summary
+      ) ||
+      "The workspace was assembled dynamically from currently available free AI ecosystem components."
+  };
+}
+
+
+// ================================================================
+// REVIEW NORMALIZATION
+// ================================================================
+
+function normalizeReview(review) {
+  if (!review || typeof review !== "object") {
+    return {
+      summary: "",
+      strengths: [],
+      weaknesses: [],
+      improvements: []
+    };
+  }
+
+  return {
+    summary:
+      cleanString(review.summary) ||
+      cleanString(review.overview),
+
+    strengths:
+      normalizeStringArray(
+        review.strengths
+      ),
+
+    weaknesses:
+      normalizeStringArray(
+        review.weaknesses
+      ),
+
+    improvements:
+      normalizeStringArray(
+        review.improvements
+      )
+  };
+}
+
+
+// ================================================================
+// HELPERS
+// ================================================================
+
+function normalizeType(type) {
+  const value =
+    cleanString(type).toLowerCase();
+
+  if (value.includes("agent")) {
+    return "Agent";
+  }
+
+  if (value.includes("tool")) {
+    return "Tool";
+  }
+
+  return "Tool";
+}
+
+
+function normalizeUrl(value) {
+  const url = cleanString(value);
+
+  if (!url) {
+    return "";
+  }
+
+  if (
+    url.startsWith("https://") ||
+    url.startsWith("http://")
+  ) {
+    return url;
+  }
+
+  return "";
+}
+
+
+function normalizeStringArray(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map(item => {
+      if (
+        typeof item === "string"
+      ) {
+        return item.trim();
+      }
+
+      if (
+        item &&
+        typeof item === "object"
+      ) {
+        return (
+          cleanString(item.text) ||
+          cleanString(item.description) ||
+          cleanString(item.name)
+        );
+      }
+
+      return "";
+    })
+    .filter(Boolean);
+}
+
+
+function cleanString(value) {
+  if (
+    value === null ||
+    value === undefined
+  ) {
+    return "";
+  }
+
+  return String(value).trim();
+}
+
+
+function extractOpenRouterError(text, status) {
+  let message = "";
+
+  try {
+    const data = JSON.parse(text);
+
+    message =
+      data?.error?.message ||
+      data?.message ||
+      data?.error ||
+      "";
+  } catch {
+    message = text;
+  }
+
+  message = cleanString(message);
+
+  if (!message) {
+    message =
+      `OpenRouter HTTP ${status}`;
+  }
+
+  // Keep Worker error responses reasonably small.
+  if (message.length > 1000) {
+    message =
+      message.slice(0, 1000) +
+      "...";
+  }
+
+  return message;
+}
+
+
+function safeErrorText(text) {
+  let value = cleanString(text);
+
+  if (value.length > 1000) {
+    value =
+      value.slice(0, 1000) +
+      "...";
+  }
+
+  return value;
+}
+
+
+function jsonResponse(data, status, corsHeaders) {
+  return new Response(
+    JSON.stringify(
+      data,
+      null,
+      2
+    ),
+    {
+      status,
+      headers: corsHeaders
+    }
+  );
+}
