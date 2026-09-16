@@ -623,6 +623,7 @@
 const WORKER_URL =
   "https://raspy-brook-525d.superagentic.workers.dev/";
 
+let ecosystem = [];
 let isBuilding = false;
 
 
@@ -643,6 +644,67 @@ const statusEl =
 
 const outputEl =
   document.getElementById("generated-stack");
+
+
+/*
+==========================================================
+LOAD ECOSYSTEM
+==========================================================
+*/
+
+async function loadEcosystem() {
+
+  try {
+
+    statusEl.textContent =
+      "Loading the autonomous ecosystem...";
+
+
+    const response =
+      await fetch(
+        WORKER_URL,
+        {
+          cache: "no-store"
+        }
+      );
+
+
+    if (!response.ok) {
+      throw new Error(
+        "Unable to load ecosystem."
+      );
+    }
+
+
+    ecosystem =
+      await response.json();
+
+
+    if (
+      !Array.isArray(ecosystem)
+    ) {
+      ecosystem = [];
+    }
+
+
+    statusEl.textContent =
+      ecosystem.length
+        ? "Ecosystem ready. Describe your workspace goal and build the stack."
+        : "No agents or tools are currently available.";
+
+
+  } catch (error) {
+
+    console.error(error);
+
+    ecosystem = [];
+
+    statusEl.textContent =
+      "Unable to load the autonomous ecosystem.";
+
+  }
+
+}
 
 
 /*
@@ -774,26 +836,147 @@ function escapeHTML(value) {
 
 /*
 ==========================================================
+FIND COMPONENT
+==========================================================
+*/
+
+function findComponent(
+  name
+) {
+
+  if (!name) {
+    return null;
+  }
+
+
+  return ecosystem.find(
+    item => {
+
+      const itemName =
+        String(
+          item.Name ||
+          item.name ||
+          ""
+        ).trim().toLowerCase();
+
+
+      return (
+        itemName ===
+        String(name)
+          .trim()
+          .toLowerCase()
+      );
+
+    }
+  );
+
+}
+
+
+/*
+==========================================================
 RENDER COMPONENT
 ==========================================================
 */
 
-function renderComponent(component, componentType) {
-  const url = component?.url || component?.URL || "";
-  const category = component?.category || component?.Category || "";
-  const description = component?.description || component?.Description || "";
+function renderComponent(
+  component,
+  componentType
+) {
+
+  const item =
+    findComponent(
+      component.name
+    );
+
+
+  const url =
+    item
+      ? (
+          item.URL ||
+          item.url ||
+          ""
+        )
+      : "";
+
+
+  const category =
+    item
+      ? (
+          item.Category ||
+          item.category ||
+          ""
+        )
+      : "";
+
 
   return `
-    <div class="component">
-      <div class="component-name">
-        ${escapeHTML(component?.name || "Unnamed")}
-        <span class="component-type">${escapeHTML(componentType)}${category ? " · " + escapeHTML(category) : ""}</span>
+
+    <div class="stack-component">
+
+      <div class="stack-component-main">
+
+        <div class="stack-component-type">
+
+          ${escapeHTML(
+            componentType
+          )}
+
+          ${
+            category
+              ? " · " +
+                escapeHTML(category)
+              : ""
+          }
+
+        </div>
+
+
+        <h4>
+
+          ${escapeHTML(
+            component.name
+          )}
+
+        </h4>
+
+
+        <p>
+
+          <strong>
+            Why selected:
+          </strong>
+
+          ${escapeHTML(
+            component.reason
+          )}
+
+        </p>
+
       </div>
-      ${description ? `<div class="component-reason">${escapeHTML(description)}</div>` : ""}
-      ${component?.reason ? `<div class="component-reason"><strong>Why selected:</strong> ${escapeHTML(component.reason)}</div>` : ""}
-      ${url ? `<a href="${escapeHTML(url)}" target="_blank" rel="noopener noreferrer" class="component-link">Open capability →</a>` : ""}
+
+
+      ${
+        url
+          ? `
+
+            <a
+              href="${escapeHTML(url)}"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="component-link"
+            >
+              Open capability →
+            </a>
+
+          `
+          : ""
+      }
+
     </div>
+
   `;
+
 }
 
 
@@ -1398,6 +1581,18 @@ async function buildStack() {
   }
 
 
+  if (
+    !ecosystem.length
+  ) {
+
+    statusEl.textContent =
+      "The ecosystem is not ready yet. Please wait a moment and try again.";
+
+    return;
+
+  }
+
+
   isBuilding =
     true;
 
@@ -1473,6 +1668,8 @@ async function buildStack() {
             JSON.stringify({
 
               goal,
+
+              ecosystem,
 
             }),
 
@@ -1584,7 +1781,7 @@ async function buildStack() {
 
           <p class="builder-error-help">
 
-            The discovery system remains available.
+            The current ecosystem remains available.
             Try building again or adjust the workspace goal.
 
           </p>
@@ -1665,6 +1862,14 @@ document
     }
   );
 
+
+/*
+==========================================================
+INITIAL LOAD
+==========================================================
+*/
+
+loadEcosystem();
 
 </script>
 
