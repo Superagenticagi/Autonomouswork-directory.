@@ -122,17 +122,11 @@ export default {
 
     Airtable is NOT accessed here.
 
-    No DuckDuckGo.
-    No Google.
-    No Bing.
-    No Tavily.
-    No external search API.
-
     The LLM itself:
 
       1. Understands the goal
       2. Identifies required capabilities
-      3. Finds suitable agents/tools from its knowledge
+      3. Finds suitable agents/tools
       4. Evaluates those components
       5. Designs the workspace
       6. Checks capability coverage
@@ -267,30 +261,21 @@ website's Agents and Tools pages.
 
 The Stack Builder is completely independent of that directory.
 
-2. DO NOT use DuckDuckGo.
 
-3. DO NOT use Google search.
-
-4. DO NOT use Bing search.
-
-5. DO NOT use Tavily, Serper, Exa, or another external search API.
-
-6. Do not claim that you performed live web research.
-
-7. "Find agents and tools" means identify suitable real-world
+2. "Find agents and tools" means identify suitable real-world
 agents, tools, platforms, frameworks and infrastructure from
 your own knowledge and reasoning.
 
-8. Do not invent products.
+3. Do not invent products.
 
-9. Do not invent capabilities.
+4. Do not invent capabilities.
 
-10. Do not invent URLs.
+5. Do not invent URLs.
 
-11. Do not claim a product is free unless you are reasonably
+6. Do not claim a product is free unless you are reasonably
 confident.
 
-12. The objective is NOT to produce a generic AI tools list.
+7. The objective is NOT to produce a generic AI tools list.
 
 The objective is to construct a coherent autonomous workspace
 that can actually accomplish THIS user's goal.
