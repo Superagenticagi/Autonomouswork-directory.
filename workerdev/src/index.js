@@ -1,11 +1,5 @@
 export default {
   async fetch(request, env) {
-    const url = new URL(request.url);
-
-    // ============================================================
-    // CORS
-    // ============================================================
-
     const corsHeaders = {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
@@ -19,13 +13,21 @@ export default {
       });
     }
 
-    // ============================================================
-    // GET
-    // Existing Airtable-backed directory endpoint
-    // ============================================================
+    if (!["GET", "POST"].includes(request.method)) {
+      return new Response("Method not allowed", {
+        status: 405,
+        headers: corsHeaders,
+      });
+    }
 
-    if (request.method === "GET") {
-      try {
+    try {
+      /*
+       * ============================================================
+       * GET — LOAD AUTONOMOUS WORK SPACE ECOSYSTEM
+       * ============================================================
+       */
+
+      if (request.method === "GET") {
         const BASE_ID = "appY6TPhOsmj3dIX8";
         const TABLE_NAME = "Table 1";
 
@@ -73,10 +75,52 @@ export default {
             "Cache-Control": "public, max-age=300",
           },
         });
-      } catch (err) {
+      }
+
+      /*
+       * ============================================================
+       * POST /build-stack
+       *
+       * IMPORTANT:
+       * Airtable is deliberately NOT used here.
+       *
+       * The Builder is now LLM-first. It receives only the user's
+       * workspace goal and independently determines:
+       *
+       * - required capabilities
+       * - appropriate agents
+       * - appropriate tools
+       * - dynamic architecture layers
+       * - gaps
+       * - recommendations
+       * - self-review
+       *
+       * The returned JSON structure remains compatible with the
+       * existing frontend architecture display.
+       * ============================================================
+       */
+
+      const url = new URL(request.url);
+
+      if (url.pathname !== "/build-stack") {
         return new Response(
           JSON.stringify({
-            error: err.message,
+            error: "Unknown endpoint",
+          }),
+          {
+            status: 404,
+            headers: {
+              ...corsHeaders,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+      }
+
+      if (!env.OPENROUTER_KEY) {
+        return new Response(
+          JSON.stringify({
+            error: "OPENROUTER_KEY is not configured on the Worker.",
           }),
           {
             status: 500,
@@ -87,28 +131,21 @@ export default {
           }
         );
       }
-    }
 
-    // ============================================================
-    // POST /build-stack
-    //
-    // IMPORTANT:
-    // Airtable is NOT used here.
-    //
-    // The LLM independently understands the user's goal,
-    // identifies capabilities, agents and tools, designs the
-    // workspace, evaluates gaps, and performs self-review.
-    // ============================================================
+      /*
+       * ============================================================
+       * READ REQUEST
+       * ============================================================
+       */
 
-    if (request.method === "POST" && url.pathname === "/build-stack") {
       let body;
 
       try {
         body = await request.json();
-      } catch (err) {
+      } catch {
         return new Response(
           JSON.stringify({
-            error: "Invalid JSON request body.",
+            error: "Invalid JSON request.",
           }),
           {
             status: 400,
@@ -125,7 +162,7 @@ export default {
       if (!goal) {
         return new Response(
           JSON.stringify({
-            error: "Workspace goal is required.",
+            error: "A workspace goal is required.",
           }),
           {
             status: 400,
@@ -137,151 +174,386 @@ export default {
         );
       }
 
-      // ------------------------------------------------------------
-      // Discover currently available FREE OpenRouter models.
-      // ------------------------------------------------------------
+      /*
+       * ============================================================
+       * SYSTEM PROMPT
+       * ============================================================
+       */
+
+      const systemPrompt = `
+You are the autonomous workspace architect for "Autonomous Work Space".
+
+Your job is to transform a user's real-world goal into a practical,
+deeply reasoned autonomous workspace architecture.
+
+IMPORTANT:
+
+This Builder is NOT connected to the Autonomous Work Space directory
+for this operation.
+
+Do NOT use Airtable.
+Do NOT expect an ecosystem catalog.
+Do NOT select components from a supplied catalog.
+Do NOT claim that a component exists in the Autonomous Work Space
+directory.
+
+Instead, reason from the user's actual goal and identify suitable
+real-world agents, agent technologies, tools, platforms, APIs,
+databases, infrastructure, and services that could realistically be
+used to build the workspace.
+
+This is NOT a simple directory recommendation task.
+
+You must think about:
+
+- what the user is actually trying to accomplish
+- what capabilities are genuinely required
+- what stages of work are required
+- which agents and tools are actually appropriate
+- how those components relate to one another
+- how the workspace can operate autonomously
+- what information must be discovered
+- what reasoning and decisions are required
+- what execution and automation are required
+- what memory or knowledge is required
+- what outputs must be produced
+- how monitoring and recovery should work
+- what weaknesses remain after the architecture is constructed
+
+IMPORTANT RULES:
+
+1. Do NOT force every goal into a fixed seven-layer template.
+
+2. Create only the layers that genuinely make sense for this
+   particular goal.
+
+3. The number of layers can vary. A simple goal may need only a few
+   layers. A complex goal may require more.
+
+4. Every layer must represent a meaningful capability, stage,
+   responsibility, or function of the actual workspace.
+
+5. Identify REAL-WORLD agents, agent technologies, tools, platforms,
+   APIs, databases, infrastructure, or services where appropriate.
+
+6. Never invent fake products.
+
+7. Do not manufacture fake URLs.
+
+8. Do not claim that an imaginary product exists.
+
+9. Do not select components merely because their name sounds relevant.
+
+10. Explain WHY every layer exists.
+
+11. Explain WHY every selected agent or tool was selected.
+
+12. Component-level reasoning is important. Give meaningful reasons,
+    not generic statements such as "this tool is useful."
+
+13. Reason from the user's actual goal, not from generic AI-directory
+    categories.
+
+14. Prefer a small number of strong components over filling the
+    architecture with weak components.
+
+15. The architecture should describe what the workspace needs to
+    accomplish, not merely list software.
+
+16. Think about the logical relationship between layers. Explain how
+    work moves from one capability to another.
+
+17. Be honest when a required capability is difficult to provide.
+
+18. Identify weaknesses in your own proposed architecture.
+
+19. The Self-Review must genuinely critique the architecture rather
+    than simply praise it.
+
+20. Architecture Logic must be detailed. Do not reduce it to a short
+    generic summary.
+
+21. Explain why the architecture has this particular structure and
+    why the selected components fit the user's goal.
+
+22. Where there are gaps, explain what is missing and why.
+
+23. Where a stronger capability, agent, or tool would be useful,
+    identify it as a recommendation.
+
+24. Do not create artificial layers simply to make the answer longer.
+
+25. Quality of reasoning is more important than the number of layers
+    or components.
+
+26. The final architecture should be understandable to a human who
+    wants to actually build the workspace.
+
+27. Preserve uncertainty where appropriate.
+
+28. Do not claim certainty when a technology's suitability depends on
+    implementation details.
+
+29. Do not turn every component into an LLM.
+
+30. Use different types of technologies where appropriate, including
+    search, databases, automation, APIs, orchestration, monitoring,
+    communication, storage, and other infrastructure.
+
+31. The selected components must collectively form a coherent
+    autonomous workflow.
+
+32. The final answer must be valid JSON.
+
+33. Return ONLY valid JSON matching the requested schema.
+
+34. Do not include markdown.
+
+35. Do not include commentary outside the JSON.
+`;
+
+      /*
+       * ============================================================
+       * USER PROMPT
+       * ============================================================
+       */
+
+      const userPrompt = `
+USER WORKSPACE GOAL:
+
+${goal}
+
+Analyze this goal carefully.
+
+First determine what the workspace actually needs to accomplish.
+
+Then determine the core capabilities required.
+
+Then identify appropriate real-world agents, agent technologies,
+tools, platforms, APIs, databases, infrastructure, and services.
+
+Then construct a dynamic architecture around those capabilities.
+
+The architecture must be designed specifically for this goal.
+
+Do NOT assume a fixed seven-layer structure.
+
+Do NOT use Airtable.
+
+Do NOT assume an existing Autonomous Work Space directory.
+
+Do NOT limit your choices to a predefined catalog.
+
+After constructing the architecture, critically review it.
+
+The final response must be detailed enough to show the reasoning behind
+the architecture while remaining realistic and technically coherent.
+
+Return JSON using exactly this structure:
+
+{
+  "goal_summary": "Detailed explanation of what the user is actually trying to build and accomplish.",
+
+  "core_capabilities": [
+    {
+      "name": "capability name",
+      "reason": "Detailed explanation of why this capability is genuinely required for this goal."
+    }
+  ],
+
+  "layers": [
+    {
+      "number": 1,
+      "name": "meaningful layer name",
+      "purpose": "Detailed explanation of what this layer is responsible for.",
+      "why_needed": "Detailed explanation of why this layer is necessary for this particular goal and how it relates to the overall architecture.",
+
+      "agents": [
+        {
+          "name": "real-world agent, agent technology, or realistic agent type",
+          "reason": "Detailed explanation of why this particular agent or agent technology was selected and how it supports the actual requirement."
+        }
+      ],
+
+      "tools": [
+        {
+          "name": "real-world tool, platform, technology, API, database, infrastructure, or service",
+          "reason": "Detailed explanation of why this particular tool or technology was selected and how it supports the actual requirement."
+        }
+      ]
+    }
+  ],
+
+  "gaps": [
+    {
+      "capability": "missing or weak capability",
+      "reason": "Detailed explanation of why the architecture cannot adequately provide this capability without additional work or infrastructure."
+    }
+  ],
+
+  "recommendations": [
+    {
+      "capability": "capability that could be improved",
+      "reason": "Explain what stronger capability, agent, tool, technology, or architectural improvement would improve the workspace and why."
+    }
+  ],
+
+  "review": {
+    "summary": "Detailed critical self-review of the proposed architecture. Discuss whether the architecture genuinely fits the goal, whether the selected components are strong matches, where the architecture is incomplete, and what risks or weaknesses remain.",
+
+    "improvements": [
+      "Specific improvement that should be considered.",
+      "Another specific improvement if one is genuinely necessary."
+    ]
+  },
+
+  "architecture_summary": "Detailed Architecture Logic. Explain how the architecture was derived from the user's goal, why these particular capabilities and layers were created, why the selected agents and tools fit their respective responsibilities, how the layers work together, why this structure is appropriate instead of a generic fixed template, where implementation limitations exist, and how the resulting workspace would operate as a coherent autonomous system."
+}
+
+IMPORTANT OUTPUT REQUIREMENTS:
+
+- "goal_summary" should explain the actual goal rather than merely
+  repeat the user's words.
+
+- "core_capabilities" should contain capabilities genuinely required
+  by the goal.
+
+- "layers" must be dynamically determined from the goal.
+
+- Each layer needs a meaningful purpose and a detailed "why_needed".
+
+- Every selected agent and tool must have a detailed component-level
+  "reason".
+
+- Use real technologies and services where appropriate.
+
+- Do not invent fake products.
+
+- Do not invent fake URLs.
+
+- Do not select components simply to increase the number of
+  components.
+
+- "gaps" should be honest. If there are no important gaps, return an
+  empty array.
+
+- "recommendations" should contain useful improvement directions when
+  appropriate.
+
+- "review.summary" must be a real critical Self-Review.
+
+- "review.improvements" must identify concrete improvements where
+  appropriate.
+
+- "architecture_summary" must be a detailed Architecture Logic
+  explanation, not a one- or two-sentence summary.
+
+- Do not shorten the reasoning merely to save tokens.
+
+- Do not include markdown.
+
+- Do not include text outside the JSON.
+`;
+
+      /*
+       * ============================================================
+       * FREE MODEL DISCOVERY
+       * ============================================================
+       */
 
       async function getFreeModels() {
-        const modelsResponse = await fetch(
-          "https://openrouter.ai/api/v1/models",
-          {
-            headers: {
-              Authorization: `Bearer ${env.OPENROUTER_API_KEY}`,
-            },
-          }
-        );
-
-        if (!modelsResponse.ok) {
-          throw new Error(
-            `OpenRouter model discovery failed: ${modelsResponse.status}`
-          );
-        }
-
-        const modelsData = await modelsResponse.json();
-        const models = Array.isArray(modelsData.data)
-          ? modelsData.data
-          : [];
-
-        const freeModels = [];
-
-        // Official free router first.
-        freeModels.push("openrouter/free");
-
-        for (const model of models) {
-          if (!model || !model.id) continue;
-
-          const id = String(model.id);
-
-          // Explicit :free models
-          if (id.endsWith(":free")) {
-            if (!freeModels.includes(id)) {
-              freeModels.push(id);
-            }
-            continue;
-          }
-
-          // Explicit zero-priced models
-          const pricing = model.pricing;
-
-          if (pricing) {
-            const promptPrice = Number(pricing.prompt);
-            const completionPrice = Number(pricing.completion);
-
-            if (
-              Number.isFinite(promptPrice) &&
-              Number.isFinite(completionPrice) &&
-              promptPrice === 0 &&
-              completionPrice === 0
-            ) {
-              if (!freeModels.includes(id)) {
-                freeModels.push(id);
-              }
-            }
-          }
-        }
-
-        return freeModels;
-      }
-
-      // ------------------------------------------------------------
-      // Extract actual model content safely.
-      // ------------------------------------------------------------
-
-      function extractContent(data) {
-        if (!data) return "";
-
-        if (
-          data.choices &&
-          data.choices[0] &&
-          data.choices[0].message
-        ) {
-          const content = data.choices[0].message.content;
-
-          if (typeof content === "string") {
-            return content.trim();
-          }
-
-          if (Array.isArray(content)) {
-            return content
-              .map((item) => {
-                if (typeof item === "string") return item;
-                if (item && typeof item.text === "string") {
-                  return item.text;
-                }
-                return "";
-              })
-              .join("")
-              .trim();
-          }
-        }
-
-        return "";
-      }
-
-      // ------------------------------------------------------------
-      // Parse JSON robustly.
-      // ------------------------------------------------------------
-
-      function parseJSON(text) {
-        if (!text || typeof text !== "string") {
-          return null;
-        }
-
-        let cleaned = text.trim();
-
-        // Remove markdown fences.
-        cleaned = cleaned
-          .replace(/^```json\s*/i, "")
-          .replace(/^```\s*/i, "")
-          .replace(/\s*```$/i, "")
-          .trim();
-
-        // First direct parse.
         try {
-          return JSON.parse(cleaned);
-        } catch (err) {}
-
-        // Try extracting the outermost JSON object.
-        const firstBrace = cleaned.indexOf("{");
-        const lastBrace = cleaned.lastIndexOf("}");
-
-        if (firstBrace !== -1 && lastBrace > firstBrace) {
-          const candidate = cleaned.slice(
-            firstBrace,
-            lastBrace + 1
+          const response = await fetch(
+            "https://openrouter.ai/api/v1/models",
+            {
+              headers: {
+                Authorization: `Bearer ${env.OPENROUTER_KEY}`,
+              },
+            }
           );
 
-          try {
-            return JSON.parse(candidate);
-          } catch (err) {}
-        }
+          if (!response.ok) {
+            return [];
+          }
 
-        return null;
+          const data = await response.json();
+
+          if (!Array.isArray(data.data)) {
+            return [];
+          }
+
+          const freeModels = data.data
+            .filter((model) => {
+              const id = String(model.id || "");
+
+              /*
+               * Explicit :free models.
+               */
+
+              if (id.endsWith(":free")) {
+                return true;
+              }
+
+              /*
+               * Explicit zero-price models.
+               */
+
+              const promptPrice =
+                Number(model?.pricing?.prompt || 0);
+
+              const completionPrice =
+                Number(model?.pricing?.completion || 0);
+
+              return (
+                promptPrice === 0 &&
+                completionPrice === 0
+              );
+            })
+            .map((model) => model.id)
+            .filter(Boolean);
+
+          return [...new Set(freeModels)];
+        } catch {
+          return [];
+        }
       }
 
-      // ------------------------------------------------------------
-      // LLM request
-      // ------------------------------------------------------------
+      /*
+       * ============================================================
+       * BUILD MODEL CANDIDATE LIST
+       * ============================================================
+       */
+
+      const discoveredFreeModels = await getFreeModels();
+
+      const modelCandidates = [
+        "openrouter/free",
+        ...discoveredFreeModels,
+      ];
+
+      const uniqueModels = [
+        ...new Set(modelCandidates),
+      ];
+
+      /*
+       * ============================================================
+       * MODEL ATTEMPT LIMIT
+       * ============================================================
+       *
+       * Keep the first model as the preferred route and allow
+       * fallback to other currently-free models if necessary.
+       */
+
+      const MAX_MODEL_ATTEMPTS = Math.min(
+        uniqueModels.length,
+        30
+      );
+
+      /*
+       * ============================================================
+       * OPENROUTER REQUEST FUNCTION
+       * ============================================================
+       */
 
       async function callModel(model) {
         const controller = new AbortController();
@@ -291,570 +563,193 @@ export default {
         }, 90000);
 
         try {
-          const prompt = `
-You are the autonomous architecture designer for Autonomous Work Space.
-
-USER'S WORKSPACE GOAL:
-${goal}
-
-Your job is to understand the goal and design a realistic autonomous workspace.
-
-Do NOT use Airtable.
-Do NOT assume that the workspace is limited to an existing directory.
-Do NOT return generic placeholders such as "Recommended agent", "Recommended tool", or "Recommended capability".
-
-Think through the user's goal first.
-
-You must:
-
-1. Understand what the user is actually trying to accomplish.
-2. Identify the capabilities required.
-3. Identify suitable REAL-WORLD AI agents, agent technologies, or agent types.
-4. Identify suitable REAL-WORLD tools, platforms, technologies, APIs, databases, infrastructure, or services.
-5. Explain why each selected component fits.
-6. Design a practical workflow showing how the components work together.
-7. Identify important capability gaps.
-8. Provide practical solutions for those gaps.
-9. Perform a self-review of the resulting architecture.
-10. Keep recommendations relevant to the actual goal.
-
-The workspace should be designed as an autonomous system rather than simply a list of software.
-
-Return ONLY valid JSON.
-
-Use exactly this structure:
-
-{
-  "goal_understanding": "short explanation of what the user wants to accomplish",
-
-  "required_capabilities": [
-    {
-      "name": "capability name",
-      "reason": "why this capability is required"
-    }
-  ],
-
-  "agents": [
-    {
-      "name": "real agent, agent technology, or realistic agent type",
-      "category": "Research",
-      "role": "what this agent does",
-      "reason": "why it fits the goal",
-      "fit": "High"
-    }
-  ],
-
-  "tools": [
-    {
-      "name": "real tool, platform, technology, API, or service",
-      "category": "Automation",
-      "role": "what it does",
-      "reason": "why it fits the goal",
-      "fit": "High"
-    }
-  ],
-
-  "workflow": [
-    {
-      "step": 1,
-      "component": "component name",
-      "action": "what happens"
-    }
-  ],
-
-  "gaps": [
-    {
-      "name": "missing capability",
-      "reason": "why it matters",
-      "solution": "how to solve it"
-    }
-  ],
-
-  "recommendations": [
-    {
-      "name": "specific recommendation",
-      "reason": "why it matters",
-      "priority": "High"
-    }
-  ],
-
-  "self_review": {
-    "summary": "short review of the architecture",
-    "strengths": [
-      "strength"
-    ],
-    "improvements": [
-      "improvement"
-    ],
-    "remaining_gaps": [
-      "remaining gap"
-    ]
-  }
-}
-
-IMPORTANT:
-- Use real technologies and services where appropriate.
-- Do not invent fake products.
-- Do not make every component an LLM.
-- Do not force unnecessary components into the architecture.
-- The number of agents and tools should depend on the goal.
-- Keep names specific.
-- Keep explanations concise enough for reliable JSON generation.
-- Do not include markdown.
-`;
-
           const response = await fetch(
             "https://openrouter.ai/api/v1/chat/completions",
             {
               method: "POST",
+
               headers: {
-                Authorization: `Bearer ${env.OPENROUTER_API_KEY}`,
+                Authorization: `Bearer ${env.OPENROUTER_KEY}`,
                 "Content-Type": "application/json",
+                "HTTP-Referer":
+                  "https://autonomouswork.space",
+                "X-Title":
+                  "Autonomous Work Space",
               },
+
               body: JSON.stringify({
                 model,
+
                 messages: [
                   {
                     role: "system",
-                    content:
-                      "You design autonomous AI workspaces. Return valid JSON only.",
+                    content: systemPrompt,
                   },
+
                   {
                     role: "user",
-                    content: prompt,
+                    content: userPrompt,
                   },
                 ],
+
+                /*
+                 * Low temperature helps preserve structured output
+                 * while still allowing goal-specific reasoning.
+                 */
+
                 temperature: 0.2,
-                max_tokens: 7000,
+
+                /*
+                 * Detailed Architecture Logic + Self-Review
+                 * legitimately requires substantial output.
+                 */
+
+                max_tokens: 8000,
               }),
+
               signal: controller.signal,
             }
           );
 
-          if (!response.ok) {
-            const errorText = await response.text();
+          const responseText = await response.text();
 
+          if (!response.ok) {
             return {
-              ok: false,
-              error: `Model returned HTTP ${response.status}`,
-              preview: errorText.slice(0, 1000),
+              success: false,
+              reason: `HTTP ${response.status}`,
+              details: responseText.slice(0, 1500),
             };
           }
 
-          const data = await response.json();
-          const content = extractContent(data);
+          let data;
+
+          try {
+            data = JSON.parse(responseText);
+          } catch {
+            return {
+              success: false,
+              reason:
+                "OpenRouter returned invalid JSON.",
+              details: responseText.slice(0, 1500),
+            };
+          }
+
+          let content =
+            data?.choices?.[0]?.message?.content;
+
+          /*
+           * Some providers return content blocks.
+           */
+
+          if (Array.isArray(content)) {
+            content = content
+              .map((part) => {
+                if (typeof part === "string") {
+                  return part;
+                }
+
+                if (
+                  part &&
+                  typeof part.text === "string"
+                ) {
+                  return part.text;
+                }
+
+                return "";
+              })
+              .join("");
+          }
+
+          content = String(content || "").trim();
 
           if (!content) {
             return {
-              ok: false,
-              error: "Model returned empty content.",
-              preview: "",
-            };
-          }
-
-          const parsed = parseJSON(content);
-
-          if (!parsed || typeof parsed !== "object") {
-            return {
-              ok: false,
-              error: "Model returned invalid JSON.",
-              preview: content.slice(0, 2000),
+              success: false,
+              reason:
+                "Model returned empty content.",
+              details: JSON.stringify(data).slice(
+                0,
+                2000
+              ),
             };
           }
 
           return {
-            ok: true,
-            data: parsed,
+            success: true,
+            content,
           };
-        } catch (err) {
+        } catch (error) {
           return {
-            ok: false,
-            error:
-              err.name === "AbortError"
+            success: false,
+            reason:
+              error?.name === "AbortError"
                 ? "Model request timed out."
-                : err.message,
-            preview: "",
+                : error?.message ||
+                  "Unknown model request error.",
+            details: "",
           };
         } finally {
           clearTimeout(timeout);
         }
       }
 
-      // ------------------------------------------------------------
-      // Validate basic Builder result.
-      // ------------------------------------------------------------
+      /*
+       * ============================================================
+       * TRY FREE MODELS
+       * ============================================================
+       */
 
-      function validResult(result) {
-        if (!result || typeof result !== "object") {
-          return false;
-        }
+      let successfulContent = "";
+      let successfulModel = "";
+      let attempts = 0;
 
-        if (
-          typeof result.goal_understanding !== "string"
-        ) {
-          return false;
-        }
-
-        if (!Array.isArray(result.required_capabilities)) {
-          return false;
-        }
-
-        if (!Array.isArray(result.agents)) {
-          return false;
-        }
-
-        if (!Array.isArray(result.tools)) {
-          return false;
-        }
-
-        if (!Array.isArray(result.workflow)) {
-          return false;
-        }
-
-        if (!Array.isArray(result.gaps)) {
-          return false;
-        }
-
-        if (!Array.isArray(result.recommendations)) {
-          return false;
-        }
-
-        if (
-          !result.self_review ||
-          typeof result.self_review !== "object"
-        ) {
-          return false;
-        }
-
-        return true;
-      }
-
-      // ------------------------------------------------------------
-      // Layer construction
-      //
-      // Keep the existing frontend-compatible architecture fields.
-      // ------------------------------------------------------------
-
-      function componentText(component) {
-        return [
-          component.name,
-          component.role,
-          component.reason,
-          component.category,
-        ]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase();
-      }
-
-      function hasAny(text, words) {
-        return words.some((word) => text.includes(word));
-      }
-
-      function buildLayers(result) {
-        const allComponents = [
-          ...(Array.isArray(result.agents)
-            ? result.agents
-            : []),
-          ...(Array.isArray(result.tools)
-            ? result.tools
-            : []),
-        ];
-
-        const layers = [];
-
-        const discovery = allComponents.filter((c) =>
-          hasAny(componentText(c), [
-            "research",
-            "search",
-            "discover",
-            "browse",
-            "browser",
-            "prospect",
-            "lead",
-            "enrichment",
-            "crawl",
-            "scrape",
-          ])
-        );
-
-        const reasoning = allComponents.filter((c) =>
-          hasAny(componentText(c), [
-            "reason",
-            "analysis",
-            "analy",
-            "planning",
-            "decision",
-            "evaluate",
-            "research agent",
-            "llm",
-            "model",
-          ])
-        );
-
-        const memory = allComponents.filter((c) =>
-          hasAny(componentText(c), [
-            "memory",
-            "database",
-            "vector",
-            "knowledge",
-            "storage",
-            "crm",
-            "record",
-            "retrieval",
-          ])
-        );
-
-        const execution = allComponents.filter((c) =>
-          hasAny(componentText(c), [
-            "automation",
-            "execute",
-            "execution",
-            "workflow",
-            "api",
-            "integration",
-            "email",
-            "outreach",
-            "send",
-            "action",
-          ])
-        );
-
-        const output = allComponents.filter((c) =>
-          hasAny(componentText(c), [
-            "output",
-            "report",
-            "delivery",
-            "dashboard",
-            "document",
-            "notification",
-            "analytics",
-          ])
-        );
-
-        const monitoring = allComponents.filter((c) =>
-          hasAny(componentText(c), [
-            "monitor",
-            "logging",
-            "log",
-            "testing",
-            "quality",
-            "recovery",
-            "failure",
-            "observability",
-            "tracking",
-          ])
-        );
-
-        const supporting = allComponents.filter(
-          (c) =>
-            !discovery.includes(c) &&
-            !reasoning.includes(c) &&
-            !memory.includes(c) &&
-            !execution.includes(c) &&
-            !output.includes(c) &&
-            !monitoring.includes(c)
-        );
-
-        function makeLayer(
-          number,
-          name,
-          purpose,
-          components
-        ) {
-          return {
-            number,
-            name,
-            purpose,
-            components: components.map((c) => ({
-              name: c.name || "Unnamed component",
-              type:
-                result.agents.includes(c)
-                  ? "Agent"
-                  : "Tool",
-              category: c.category || "",
-              role: c.role || "",
-              reason: c.reason || "",
-              fit: c.fit || "",
-            })),
-          };
-        }
-
-        if (discovery.length) {
-          layers.push(
-            makeLayer(
-              layers.length + 1,
-              "Discovery",
-              "Finds and gathers the information required to perform the user's work.",
-              discovery
-            )
-          );
-        }
-
-        if (reasoning.length) {
-          layers.push(
-            makeLayer(
-              layers.length + 1,
-              "Reasoning & Analysis",
-              "Processes information, performs reasoning, evaluation, planning, and decisions.",
-              reasoning
-            )
-          );
-        }
-
-        if (memory.length) {
-          layers.push(
-            makeLayer(
-              layers.length + 1,
-              "Memory & Knowledge",
-              "Stores and retrieves information needed for continued autonomous operation.",
-              memory
-            )
-          );
-        }
-
-        if (execution.length) {
-          layers.push(
-            makeLayer(
-              layers.length + 1,
-              "Execution & Automation",
-              "Carries out actions, integrations, and autonomous workflow execution.",
-              execution
-            )
-          );
-        }
-
-        if (output.length) {
-          layers.push(
-            makeLayer(
-              layers.length + 1,
-              "Output & Delivery",
-              "Transforms completed work into useful outputs and delivers them.",
-              output
-            )
-          );
-        }
-
-        if (monitoring.length) {
-          layers.push(
-            makeLayer(
-              layers.length + 1,
-              "Monitoring & Recovery",
-              "Monitors the workspace, detects failures, and supports recovery and quality control.",
-              monitoring
-            )
-          );
-        }
-
-        if (supporting.length) {
-          layers.push(
-            makeLayer(
-              layers.length + 1,
-              "Supporting Components",
-              "Provides additional capabilities required by the workspace.",
-              supporting
-            )
-          );
-        }
-
-        return layers;
-      }
-
-      // ------------------------------------------------------------
-      // Normalize recommendations.
-      // ------------------------------------------------------------
-
-      function normalizeRecommendations(items) {
-        if (!Array.isArray(items)) return [];
-
-        return items
-          .filter((item) => item && typeof item === "object")
-          .filter((item) => {
-            const name = String(item.name || "").trim();
-
-            if (!name) return false;
-
-            const lower = name.toLowerCase();
-
-            return ![
-              "recommended capability",
-              "recommended agent",
-              "recommended tool",
-              "recommended component",
-            ].includes(lower);
-          })
-          .map((item) => ({
-            name: String(item.name || "").trim(),
-            reason: String(item.reason || "").trim(),
-            priority: String(
-              item.priority || "Medium"
-            ).trim(),
-          }));
-      }
-
-      // ------------------------------------------------------------
-      // Try free models until one produces valid Builder JSON.
-      // ------------------------------------------------------------
-
-      let models;
-
-      try {
-        models = await getFreeModels();
-      } catch (err) {
-        return new Response(
-          JSON.stringify({
-            error: "Unable to discover free OpenRouter models.",
-            details: err.message,
-          }),
-          {
-            status: 502,
-            headers: {
-              ...corsHeaders,
-              "Content-Type": "application/json",
-            },
-          }
-        );
-      }
-
-      const MAX_MODEL_ATTEMPTS = 30;
-
-      const attempts = [];
-      let builderResult = null;
-      let selectedModel = null;
+      const failures = [];
 
       for (
-        let i = 0;
-        i < models.length && i < MAX_MODEL_ATTEMPTS;
-        i++
+        const model of uniqueModels.slice(
+          0,
+          MAX_MODEL_ATTEMPTS
+        )
       ) {
-        const model = models[i];
+        attempts++;
 
         const result = await callModel(model);
 
-        attempts.push({
-          model,
-          success: result.ok,
-          error: result.ok ? null : result.error,
-          response_preview: result.ok
-            ? null
-            : result.preview || "",
-        });
-
-        if (result.ok && validResult(result.data)) {
-          builderResult = result.data;
-          selectedModel = model;
+        if (result.success) {
+          successfulContent = result.content;
+          successfulModel = model;
           break;
         }
+
+        failures.push({
+          model,
+          reason: result.reason,
+          details: result.details || "",
+        });
       }
 
-      if (!builderResult) {
+      /*
+       * ============================================================
+       * ALL FREE MODELS FAILED
+       * ============================================================
+       */
+
+      if (!successfulContent) {
         return new Response(
           JSON.stringify(
             {
               error:
-                "The workspace could not be built. No free model returned a valid workspace result.",
-              model_attempts: attempts,
-              models_available: models.length,
+                "All available free reasoning models failed to return a usable response.",
+
+              attempts,
+
+              models_tried:
+                uniqueModels.slice(
+                  0,
+                  MAX_MODEL_ATTEMPTS
+                ),
+
+              failures,
             },
             null,
             2
@@ -869,177 +764,519 @@ IMPORTANT:
         );
       }
 
-      // ------------------------------------------------------------
-      // Preserve the Builder's frontend-compatible result structure.
-      // ------------------------------------------------------------
+      /*
+       * ============================================================
+       * PARSE ARCHITECTURE JSON
+       * ============================================================
+       */
 
-      const layers = buildLayers(builderResult);
+      let architecture;
 
-      const agents = Array.isArray(builderResult.agents)
-        ? builderResult.agents
-        : [];
+      try {
+        architecture = JSON.parse(
+          successfulContent
+        );
+      } catch {
+        /*
+         * Recover JSON if a model accidentally adds
+         * surrounding text or markdown fences.
+         */
 
-      const tools = Array.isArray(builderResult.tools)
-        ? builderResult.tools
-        : [];
+        let cleaned =
+          successfulContent.trim();
 
-      const workflow = Array.isArray(builderResult.workflow)
-        ? builderResult.workflow
-        : [];
+        /*
+         * Remove common markdown JSON fences.
+         */
 
-      const gaps = Array.isArray(builderResult.gaps)
-        ? builderResult.gaps
-        : [];
+        cleaned = cleaned
+          .replace(/^```json\s*/i, "")
+          .replace(/^```\s*/i, "")
+          .replace(/\s*```$/i, "")
+          .trim();
 
-      const recommendations = normalizeRecommendations(
-        builderResult.recommendations
-      );
+        try {
+          architecture = JSON.parse(cleaned);
+        } catch {
+          /*
+           * Last recovery attempt:
+           * extract the outermost JSON object.
+           */
 
-      const architectureSummary =
-        `The workspace for "${goal}" uses ` +
-        `${agents.length} agents and ${tools.length} tools ` +
-        `across ${layers.length} dynamically designed layers. ` +
-        `The layers organize discovery, reasoning, memory, ` +
-        `execution, delivery, monitoring, or other functions ` +
-        `according to the actual components selected for the goal.`;
+          const start =
+            cleaned.indexOf("{");
 
-      const architecture = {
-        goal,
-        layers,
-      };
+          const end =
+            cleaned.lastIndexOf("}");
 
-      const responsePayload = {
-        architecture,
+          if (
+            start === -1 ||
+            end === -1 ||
+            end <= start
+          ) {
+            return new Response(
+              JSON.stringify(
+                {
+                  error:
+                    "The reasoning model returned content, but it was not valid JSON.",
 
-        goal_understanding:
-          builderResult.goal_understanding,
+                  model:
+                    successfulModel,
 
-        required_capabilities:
-          builderResult.required_capabilities,
+                  raw:
+                    successfulContent.slice(
+                      0,
+                      3000
+                    ),
+                },
+                null,
+                2
+              ),
+              {
+                status: 502,
+                headers: {
+                  ...corsHeaders,
+                  "Content-Type":
+                    "application/json",
+                },
+              }
+            );
+          }
 
-        agents,
+          try {
+            architecture = JSON.parse(
+              cleaned.slice(
+                start,
+                end + 1
+              )
+            );
+          } catch {
+            return new Response(
+              JSON.stringify(
+                {
+                  error:
+                    "Could not parse the reasoning model response.",
 
-        tools,
+                  model:
+                    successfulModel,
 
-        layers,
+                  raw:
+                    successfulContent.slice(
+                      0,
+                      3000
+                    ),
+                },
+                null,
+                2
+              ),
+              {
+                status: 502,
+                headers: {
+                  ...corsHeaders,
+                  "Content-Type":
+                    "application/json",
+                },
+              }
+            );
+          }
+        }
+      }
 
-        architecture_summary:
-          architectureSummary,
+      /*
+       * ============================================================
+       * BASIC OUTPUT VALIDATION
+       * ============================================================
+       *
+       * We do not reject a useful architecture just because
+       * one optional section is missing.
+       *
+       * We ensure the important structural fields exist.
+       * ============================================================
+       */
 
-        workflow,
+      if (
+        !architecture ||
+        typeof architecture !== "object"
+      ) {
+        return new Response(
+          JSON.stringify(
+            {
+              error:
+                "The reasoning model returned an invalid architecture object.",
 
-        component_evaluation: [
-          ...agents.map((agent) => ({
-            name: agent.name || "",
-            type: "Agent",
-            category: agent.category || "",
-            role: agent.role || "",
-            reason: agent.reason || "",
-            fit: agent.fit || "",
-          })),
+              model:
+                successfulModel,
+            },
+            null,
+            2
+          ),
+          {
+            status: 502,
+            headers: {
+              ...corsHeaders,
+              "Content-Type":
+                "application/json",
+            },
+          }
+        );
+      }
 
-          ...tools.map((tool) => ({
-            name: tool.name || "",
-            type: "Tool",
-            category: tool.category || "",
-            role: tool.role || "",
-            reason: tool.reason || "",
-            fit: tool.fit || "",
-          })),
-        ],
+      if (
+        typeof architecture.goal_summary !==
+        "string"
+      ) {
+        architecture.goal_summary = "";
+      }
 
-        capability_gaps: gaps,
+      if (
+        !Array.isArray(
+          architecture.core_capabilities
+        )
+      ) {
+        architecture.core_capabilities = [];
+      }
 
-        gap_solutions: gaps.map((gap) => ({
-          name: gap.name || "",
-          reason: gap.reason || "",
-          solution: gap.solution || "",
-        })),
+      if (
+        !Array.isArray(
+          architecture.layers
+        )
+      ) {
+        architecture.layers = [];
+      }
 
-        final_architecture: {
-          goal,
-          layers,
-          agents,
-          tools,
-          workflow,
-        },
+      if (
+        !Array.isArray(
+          architecture.gaps
+        )
+      ) {
+        architecture.gaps = [];
+      }
 
-        autonomy_logic:
-          "The workspace is designed to understand the goal, gather required information, reason over that information, execute the necessary workflow, produce outputs, and monitor or recover from failures where appropriate.",
+      if (
+        !Array.isArray(
+          architecture.recommendations
+        )
+      ) {
+        architecture.recommendations = [];
+      }
 
-        failure_recovery:
-          "The architecture should validate important outputs, detect execution failures, retry recoverable operations, and escalate unresolved issues where autonomous recovery is not reliable.",
+      /*
+       * Preserve the frontend's existing review schema.
+       */
 
-        human_involvement:
-          "Human involvement should be limited to decisions or actions that require approval, sensitive judgment, credentials, legal responsibility, or other safeguards identified during deployment.",
-
-        recommendations,
-
-        external_recommendations: recommendations,
-
-        review: {
+      if (
+        !architecture.review ||
+        typeof architecture.review !==
+          "object"
+      ) {
+        architecture.review = {
           summary:
-            builderResult.self_review.summary || "",
+            "The architecture was generated, but the reasoning model did not provide a separate self-review.",
 
-          strengths:
-            Array.isArray(
-              builderResult.self_review.strengths
-            )
-              ? builderResult.self_review.strengths
-              : [],
+          improvements: [],
+        };
+      }
 
-          improvements:
-            Array.isArray(
-              builderResult.self_review.improvements
-            )
-              ? builderResult.self_review.improvements
-              : [],
+      if (
+        typeof architecture.review.summary !==
+        "string"
+      ) {
+        architecture.review.summary = "";
+      }
 
-          remaining_gaps:
-            Array.isArray(
-              builderResult.self_review.remaining_gaps
-            )
-              ? builderResult.self_review.remaining_gaps
-              : [],
-        },
+      if (
+        !Array.isArray(
+          architecture.review.improvements
+        )
+      ) {
+        architecture.review.improvements = [];
+      }
 
-        model_used: selectedModel,
+      if (
+        typeof architecture.architecture_summary !==
+        "string"
+      ) {
+        architecture.architecture_summary = "";
+      }
 
-        model_attempts: attempts,
+      /*
+       * ============================================================
+       * NORMALIZE LAYERS
+       * ============================================================
+       *
+       * Preserve the model's dynamic layer structure.
+       * We do NOT impose a fixed seven-layer template.
+       */
 
-        builder_version: "V8.1",
+      architecture.layers =
+        architecture.layers.map(
+          (layer, index) => {
+            if (
+              !layer ||
+              typeof layer !== "object"
+            ) {
+              return {
+                number: index + 1,
+                name: "Workspace Layer",
+                purpose: "",
+                why_needed: "",
+                agents: [],
+                tools: [],
+              };
+            }
 
-        builder_mode:
-          "LLM-first autonomous workspace discovery",
-      };
+            if (
+              typeof layer.number !== "number"
+            ) {
+              layer.number = index + 1;
+            }
+
+            if (
+              typeof layer.name !== "string" ||
+              !layer.name.trim()
+            ) {
+              layer.name =
+                "Workspace Layer";
+            }
+
+            if (
+              typeof layer.purpose !==
+              "string"
+            ) {
+              layer.purpose = "";
+            }
+
+            if (
+              typeof layer.why_needed !==
+              "string"
+            ) {
+              layer.why_needed = "";
+            }
+
+            if (
+              !Array.isArray(layer.agents)
+            ) {
+              layer.agents = [];
+            }
+
+            if (
+              !Array.isArray(layer.tools)
+            ) {
+              layer.tools = [];
+            }
+
+            layer.agents =
+              layer.agents.map((agent) => ({
+                name:
+                  typeof agent?.name ===
+                  "string"
+                    ? agent.name
+                    : "Unnamed agent",
+
+                reason:
+                  typeof agent?.reason ===
+                  "string"
+                    ? agent.reason
+                    : "",
+              }));
+
+            layer.tools =
+              layer.tools.map((tool) => ({
+                name:
+                  typeof tool?.name ===
+                  "string"
+                    ? tool.name
+                    : "Unnamed tool",
+
+                reason:
+                  typeof tool?.reason ===
+                  "string"
+                    ? tool.reason
+                    : "",
+              }));
+
+            return layer;
+          }
+        );
+
+      /*
+       * ============================================================
+       * NORMALIZE CORE CAPABILITIES
+       * ============================================================
+       */
+
+      architecture.core_capabilities =
+        architecture.core_capabilities.map(
+          (item) => ({
+            name:
+              typeof item?.name === "string"
+                ? item.name
+                : "Capability",
+
+            reason:
+              typeof item?.reason === "string"
+                ? item.reason
+                : "",
+          })
+        );
+
+      /*
+       * ============================================================
+       * NORMALIZE GAPS
+       * ============================================================
+       */
+
+      architecture.gaps =
+        architecture.gaps.map(
+          (gap) => ({
+            capability:
+              typeof gap?.capability ===
+              "string"
+                ? gap.capability
+                : "Unspecified capability gap",
+
+            reason:
+              typeof gap?.reason === "string"
+                ? gap.reason
+                : "",
+          })
+        );
+
+      /*
+       * ============================================================
+       * NORMALIZE RECOMMENDATIONS
+       * ============================================================
+       */
+
+      architecture.recommendations =
+        architecture.recommendations
+          .filter(
+            (item) =>
+              item &&
+              typeof item === "object"
+          )
+          .filter((item) => {
+            const capability =
+              String(
+                item.capability || ""
+              ).trim();
+
+            /*
+             * Remove obvious placeholder outputs.
+             */
+
+            const lower =
+              capability.toLowerCase();
+
+            return (
+              capability &&
+              lower !==
+                "recommended capability" &&
+              lower !==
+                "recommended component" &&
+              lower !==
+                "recommended agent" &&
+              lower !==
+                "recommended tool"
+            );
+          })
+          .map((item) => ({
+            capability:
+              String(
+                item.capability || ""
+              ).trim(),
+
+            reason:
+              String(
+                item.reason || ""
+              ).trim(),
+          }));
+
+      /*
+       * ============================================================
+       * FINAL ARCHITECTURE LOGIC SAFETY
+       * ============================================================
+       *
+       * If the model gives an empty architecture summary, provide a
+       * useful deterministic explanation without replacing the
+       * model's architecture.
+       */
+
+      if (
+        !architecture.architecture_summary.trim()
+      ) {
+        const layerCount =
+          architecture.layers.length;
+
+        const componentCount =
+          architecture.layers.reduce(
+            (total, layer) =>
+              total +
+              layer.agents.length +
+              layer.tools.length,
+            0
+          );
+
+        architecture.architecture_summary =
+          `The workspace architecture was derived from the user's goal rather than from a fixed template. It contains ${layerCount} dynamically determined layers and ${componentCount} selected components. Each layer represents a meaningful responsibility in the autonomous workflow, while the selected agents and tools support the capabilities required for that responsibility.`;
+      }
+
+      /*
+       * ============================================================
+       * FINAL RESPONSE
+       * ============================================================
+       */
 
       return new Response(
-        JSON.stringify(responsePayload, null, 2),
+        JSON.stringify(
+          {
+            success: true,
+
+            architecture,
+
+            model_used:
+              successfulModel,
+
+            model_attempts:
+              attempts,
+          },
+          null,
+          2
+        ),
         {
           status: 200,
+
           headers: {
             ...corsHeaders,
-            "Content-Type": "application/json",
-            "Cache-Control": "no-store",
+            "Content-Type":
+              "application/json",
+
+            "Cache-Control":
+              "no-store",
+          },
+        }
+      );
+    } catch (error) {
+      return new Response(
+        JSON.stringify(
+          {
+            error:
+              error?.message ||
+              "Unexpected Worker error.",
+          },
+          null,
+          2
+        ),
+        {
+          status: 500,
+
+          headers: {
+            ...corsHeaders,
+            "Content-Type":
+              "application/json",
           },
         }
       );
     }
-
-    // ============================================================
-    // Other POST requests
-    // ============================================================
-
-    if (request.method === "POST") {
-      return new Response("Not found", {
-        status: 404,
-        headers: corsHeaders,
-      });
-    }
-
-    return new Response("Method not allowed", {
-      status: 405,
-      headers: corsHeaders,
-    });
   },
 };
