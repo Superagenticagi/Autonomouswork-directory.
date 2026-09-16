@@ -435,8 +435,8 @@
             <span class="card-number">03</span>
             <h3>Compose</h3>
             <p>
-              It independently discovers relevant real agents and tools
-              for the goal instead of being restricted to the directory.
+              It searches the current Autonomous Work Space ecosystem and
+              selects the most relevant available agents and tools.
             </p>
           </div>
 
@@ -661,7 +661,7 @@ function showProgress(
 
     "Analyzing required capabilities",
 
-    "Discovering relevant agents and tools",
+    "Studying available agents and tools",
 
     "Designing the workspace architecture",
 
@@ -778,85 +778,22 @@ RENDER COMPONENT
 ==========================================================
 */
 
-function renderComponent(
-  component,
-  componentType
-) {
-
-  component = component || {};
-
-  const url =
-    component.url ||
-    component.URL ||
-    "";
-
-  const category =
-    component.category ||
-    component.Category ||
-    "";
-
-  const availability =
-    String(component.availability || "").trim();
+function renderComponent(component, componentType) {
+  const url = component?.url || component?.URL || "";
+  const category = component?.category || component?.Category || "";
+  const description = component?.description || component?.Description || "";
 
   return `
-
-    <div class="stack-component">
-
-      <div class="stack-component-main">
-
-        <div class="stack-component-type">
-
-          ${escapeHTML(componentType)}
-
-          ${
-            category
-              ? " · " + escapeHTML(category)
-              : ""
-          }
-
-          ${
-            availability
-              ? " · " + escapeHTML(availability)
-              : ""
-          }
-
-        </div>
-
-        <h4>
-          ${escapeHTML(component.name)}
-        </h4>
-
-        <p>
-          <strong>
-            Why selected:
-          </strong>
-
-          ${escapeHTML(component.reason)}
-        </p>
-
+    <div class="component">
+      <div class="component-name">
+        ${escapeHTML(component?.name || "Unnamed")}
+        <span class="component-type">${escapeHTML(componentType)}${category ? " · " + escapeHTML(category) : ""}</span>
       </div>
-
-      ${
-        url
-          ? `
-
-            <a
-              href="${escapeHTML(url)}"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="component-link"
-            >
-              Open capability →
-            </a>
-
-          `
-          : ""
-      }
-
+      ${description ? `<div class="component-reason">${escapeHTML(description)}</div>` : ""}
+      ${component?.reason ? `<div class="component-reason"><strong>Why selected:</strong> ${escapeHTML(component.reason)}</div>` : ""}
+      ${url ? `<a href="${escapeHTML(url)}" target="_blank" rel="noopener noreferrer" class="component-link">Open capability →</a>` : ""}
     </div>
-
   `;
-
 }
 
 
@@ -1461,7 +1398,6 @@ async function buildStack() {
   }
 
 
-
   isBuilding =
     true;
 
@@ -1728,13 +1664,6 @@ document
       );
     }
   );
-
-
-/*
-==========================================================
-INITIAL LOAD
-==========================================================
-*/
 
 
 </script>
