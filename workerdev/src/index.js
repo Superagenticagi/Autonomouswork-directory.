@@ -6,9 +6,9 @@ export default {
       "Access-Control-Allow-Headers": "Content-Type",
     };
 
-    // ==========================================================
-    // CORS PREFLIGHT
-    // ==========================================================
+    // =========================================================
+    // CORS
+    // =========================================================
 
     if (request.method === "OPTIONS") {
       return new Response(null, {
@@ -17,17 +17,15 @@ export default {
       });
     }
 
-    // ==========================================================
+    // =========================================================
     // GET
-    // ==========================================================
-    // IMPORTANT:
-    // This remains the original Airtable directory endpoint.
     //
-    // Agents / Tools pages can continue loading the Airtable
-    // directory exactly as before.
+    // KEEP THIS AS THE AIRTABLE DIRECTORY ENDPOINT.
     //
-    // Airtable is NOT used by /build-stack.
-    // ==========================================================
+    // The Builder itself does NOT use Airtable.
+    // The existing frontend can still use GET to load the
+    // directory/ecosystem and determine that it is ready.
+    // =========================================================
 
     if (request.method === "GET") {
       try {
@@ -35,9 +33,7 @@ export default {
         const TABLE_NAME = "Table 1";
 
         const airtableUrl =
-          `https://api.airtable.com/v0/${BASE_ID}/${encodeURIComponent(
-            TABLE_NAME
-          )}?maxRecords=100`;
+          `https://api.airtable.com/v0/${BASE_ID}/${encodeURIComponent(TABLE_NAME)}?maxRecords=100`;
 
         const response = await fetch(airtableUrl, {
           headers: {
@@ -47,9 +43,12 @@ export default {
         });
 
         if (!response.ok) {
+          const errorText = await response.text();
+
           return new Response(
             JSON.stringify({
               error: "Failed to fetch from Airtable",
+              details: errorText,
             }),
             {
               status: response.status,
@@ -69,20 +68,17 @@ export default {
           Type: record.fields.Type || "Unknown",
           Description: record.fields.Description || "",
           URL: record.fields.URL || "",
-          Category:
-            record.fields.Category || "Uncategorized",
+          Category: record.fields.Category || "Uncategorized",
           created: record.createdTime,
         }));
 
         return new Response(
           JSON.stringify(items, null, 2),
           {
-            status: 200,
             headers: {
               ...corsHeaders,
               "Content-Type": "application/json",
-              "Cache-Control":
-                "public, max-age=300",
+              "Cache-Control": "public, max-age=300",
             },
           }
         );
@@ -102,45 +98,33 @@ export default {
       }
     }
 
-    // ==========================================================
-    // POST
-    // ==========================================================
-    // POST /build-stack
-    //
-    // IMPORTANT:
-    // Airtable is deliberately NOT used here.
-    //
-    // The LLM receives the user's goal and independently reasons
-    // about suitable agents, tools, platforms and services.
-    // ==========================================================
+    // =========================================================
+    // ONLY POST IS ALLOWED FOR THE STACK BUILDER
+    // =========================================================
 
     if (request.method !== "POST") {
       return new Response(
-        JSON.stringify({
-          error: "Method not allowed",
-        }),
+        "Method not allowed",
         {
           status: 405,
-          headers: {
-            ...corsHeaders,
-            "Content-Type": "application/json",
-          },
+          headers: corsHeaders,
         }
       );
     }
 
-    // ==========================================================
-    // PARSE REQUEST
-    // ==========================================================
+    // =========================================================
+    // READ REQUEST
+    // =========================================================
 
     let body;
 
     try {
       body = await request.json();
-    } catch (err) {
+    } catch {
       return new Response(
         JSON.stringify({
-          error: "Invalid JSON request body",
+          success: false,
+          error: "Invalid JSON request body.",
         }),
         {
           status: 400,
@@ -152,15 +136,15 @@ export default {
       );
     }
 
-    const goal =
-      typeof body.goal === "string"
-        ? body.goal.trim()
-        : "";
+    const goal = String(
+      body?.goal || ""
+    ).trim();
 
     if (!goal) {
       return new Response(
         JSON.stringify({
-          error: "A goal is required.",
+          success: false,
+          error: "Please provide a goal.",
         }),
         {
           status: 400,
@@ -172,15 +156,15 @@ export default {
       );
     }
 
-    // ==========================================================
-    // OPENROUTER KEY
-    // ==========================================================
+    // =========================================================
+    // OPENROUTER KEY CHECK
+    // =========================================================
 
     if (!env.OPENROUTER_KEY) {
       return new Response(
         JSON.stringify({
-          error:
-            "OPENROUTER_KEY is not configured.",
+          success: false,
+          error: "OPENROUTER_KEY is not configured.",
         }),
         {
           status: 500,
@@ -192,17 +176,26 @@ export default {
       );
     }
 
+    // =========================================================
+    // CONFIGURATION
+    // =========================================================
+
     const OPENROUTER_URL =
       "https://openrouter.ai/api/v1/chat/completions";
 
     const MODELS_URL =
       "https://openrouter.ai/api/v1/models";
 
-    const MAX_MODEL_ATTEMPTS = 8;
+    // Maximum number of explicit free models retained
+    // for manual recovery.
+    const MAX_FREE_MODELS = 12;
 
-    // ==========================================================
-    // JSON RESPONSE HELPER
-    // ==========================================================
+    // Maximum time allowed for one model request.
+    const MODEL_TIMEOUT_MS = 45000;
+
+    // =========================================================
+    // RESPONSE HELPER
+    // =========================================================
 
     function jsonResponse(data, status = 200) {
       return new Response(
@@ -212,145 +205,244 @@ export default {
           headers: {
             ...corsHeaders,
             "Content-Type": "application/json",
-            "Cache-Control": "no-store",
           },
         }
       );
     }
 
-    // ==========================================================
-    // CLEAN MODEL RESPONSE
-    // ==========================================================
+    // =========================================================
+    // CLEAN TEXT
+    // =========================================================
 
-    function cleanText(text) {
-      if (typeof text !== "string") {
+    function cleanText(value) {
+      if (
+        value === null ||
+        value === undefined
+      ) {
         return "";
       }
 
-      return text
-        .replace(/^```json\s*/i, "")
-        .replace(/^```\s*/i, "")
-        .replace(/\s*```$/i, "")
+      return String(value)
+        .replace(/\u0000/g, "")
         .trim();
     }
 
-    // ==========================================================
-    // EXTRACT JSON
-    // ==========================================================
+    // =========================================================
+    // EXTRACT JSON FROM MODEL RESPONSE
+    // =========================================================
 
     function extractJSON(text) {
       if (!text) {
-        return null;
+        throw new Error(
+          "Empty model response."
+        );
       }
 
-      const cleaned = cleanText(text);
+      let cleaned =
+        String(text).trim();
 
-      // Direct JSON
+      // Remove markdown fences.
+      cleaned = cleaned
+        .replace(
+          /^```json\s*/i,
+          ""
+        )
+        .replace(
+          /^```\s*/i,
+          ""
+        )
+        .replace(
+          /\s*```$/i,
+          ""
+        )
+        .trim();
+
+      // -------------------------------------------------------
+      // Attempt 1: complete JSON
+      // -------------------------------------------------------
+
       try {
         return JSON.parse(cleaned);
-      } catch (err) {}
+      } catch {}
 
-      // JSON object
-      const objectStart =
+      // -------------------------------------------------------
+      // Attempt 2: find JSON object
+      // -------------------------------------------------------
+
+      const firstObject =
         cleaned.indexOf("{");
 
-      const objectEnd =
+      const lastObject =
         cleaned.lastIndexOf("}");
 
       if (
-        objectStart !== -1 &&
-        objectEnd > objectStart
+        firstObject !== -1 &&
+        lastObject > firstObject
       ) {
         const candidate =
           cleaned.slice(
-            objectStart,
-            objectEnd + 1
+            firstObject,
+            lastObject + 1
           );
 
         try {
           return JSON.parse(candidate);
-        } catch (err) {}
+        } catch {}
       }
 
-      // JSON array
-      const arrayStart =
+      // -------------------------------------------------------
+      // Attempt 3: find JSON array
+      // -------------------------------------------------------
+
+      const firstArray =
         cleaned.indexOf("[");
 
-      const arrayEnd =
+      const lastArray =
         cleaned.lastIndexOf("]");
 
       if (
-        arrayStart !== -1 &&
-        arrayEnd > arrayStart
+        firstArray !== -1 &&
+        lastArray > firstArray
       ) {
         const candidate =
           cleaned.slice(
-            arrayStart,
-            arrayEnd + 1
+            firstArray,
+            lastArray + 1
           );
 
         try {
           return JSON.parse(candidate);
-        } catch (err) {}
+        } catch {}
       }
 
-      return null;
+      throw new Error(
+        "Model returned text, but valid JSON could not be extracted."
+      );
     }
 
-    // ==========================================================
-    // DISCOVER FREE OPENROUTER MODELS
-    // ==========================================================
+    // =========================================================
+    // EXTRACT CONTENT FROM OPENROUTER RESPONSE
+    // =========================================================
+
+    function extractContent(data) {
+      const choice =
+        data?.choices?.[0];
+
+      if (!choice) {
+        throw new Error(
+          "OpenRouter returned no choices."
+        );
+      }
+
+      const content =
+        choice?.message?.content;
+
+      // Normal string response.
+      if (
+        typeof content === "string"
+      ) {
+        return content;
+      }
+
+      // Some models/APIs may return content blocks.
+      if (
+        Array.isArray(content)
+      ) {
+        return content
+          .map((block) => {
+            if (
+              typeof block === "string"
+            ) {
+              return block;
+            }
+
+            if (block?.text) {
+              return block.text;
+            }
+
+            if (block?.content) {
+              return block.content;
+            }
+
+            return "";
+          })
+          .join("\n")
+          .trim();
+      }
+
+      throw new Error(
+        "Model returned unsupported content format."
+      );
+    }
+
+    // =========================================================
+    // DISCOVER FREE MODELS
+    //
+    // Uses OpenRouter's official Models API.
+    //
+    // We recognize:
+    //
+    //   model:free
+    //
+    // and models whose prompt + completion pricing are zero.
+    // =========================================================
 
     async function getFreeModels() {
-      const discovered = [];
-
       try {
         const response =
-          await fetch(MODELS_URL, {
-            headers: {
-              Authorization:
-                `Bearer ${env.OPENROUTER_KEY}`,
-            },
-          });
+          await fetch(
+            MODELS_URL,
+            {
+              headers: {
+                Authorization:
+                  `Bearer ${env.OPENROUTER_KEY}`,
+              },
+            }
+          );
 
         if (!response.ok) {
-          return discovered;
+          return [];
         }
 
         const data =
           await response.json();
 
-        if (!Array.isArray(data.data)) {
-          return discovered;
-        }
+        const models =
+          Array.isArray(data?.data)
+            ? data.data
+            : [];
 
-        for (const model of data.data) {
-          if (!model || !model.id) {
-            continue;
-          }
+        const free = [];
 
+        for (
+          const model of models
+        ) {
           const id =
-            String(model.id);
+            model?.id;
 
-          // Explicit :free models
-          if (id.endsWith(":free")) {
-            discovered.push(id);
+          if (
+            !id ||
+            typeof id !== "string"
+          ) {
             continue;
           }
 
-          // Explicit zero-priced models
-          if (model.pricing) {
-            const promptPrice =
-              Number(
-                model.pricing.prompt
-              );
+          const pricing =
+            model?.pricing || {};
 
-            const completionPrice =
-              Number(
-                model.pricing.completion
-              );
+          const promptPrice =
+            Number(
+              pricing.prompt
+            );
 
-            if (
+          const completionPrice =
+            Number(
+              pricing.completion
+            );
+
+          const explicitFree =
+            id.endsWith(":free") ||
+            (
               Number.isFinite(
                 promptPrice
               ) &&
@@ -359,955 +451,1353 @@ export default {
               ) &&
               promptPrice === 0 &&
               completionPrice === 0
-            ) {
-              discovered.push(id);
-            }
-          }
-        }
-      } catch (err) {
-        // openrouter/free remains available
-      }
+            );
 
-      return [
-        ...new Set(discovered),
-      ];
+          if (!explicitFree) {
+            continue;
+          }
+
+          const supported =
+            model?.supported_parameters ||
+            [];
+
+          const supportsResponseFormat =
+            Array.isArray(
+              supported
+            ) &&
+            (
+              supported.includes(
+                "response_format"
+              ) ||
+              supported.includes(
+                "structured_outputs"
+              )
+            );
+
+          free.push({
+            id,
+            supportsResponseFormat,
+            contextLength:
+              Number(
+                model?.context_length
+              ) || 0,
+          });
+        }
+
+        // Prefer models that advertise structured output support.
+        free.sort(
+          (a, b) => {
+            if (
+              a.supportsResponseFormat &&
+              !b.supportsResponseFormat
+            ) {
+              return -1;
+            }
+
+            if (
+              !a.supportsResponseFormat &&
+              b.supportsResponseFormat
+            ) {
+              return 1;
+            }
+
+            return (
+              b.contextLength -
+              a.contextLength
+            );
+          }
+        );
+
+        return free
+          .map(
+            (item) => item.id
+          )
+          .filter(Boolean)
+          .slice(
+            0,
+            MAX_FREE_MODELS
+          );
+      } catch {
+        return [];
+      }
     }
 
-    // ==========================================================
-    // MODEL CANDIDATES
-    // ==========================================================
+    // =========================================================
+    // BUILD FREE MODEL CANDIDATE LIST
+    // =========================================================
 
     async function getModelCandidates() {
-      const candidates = [
-        "openrouter/free",
-      ];
-
       const discovered =
         await getFreeModels();
 
-      for (const model of discovered) {
-        if (
-          !candidates.includes(model)
-        ) {
-          candidates.push(model);
-        }
-      }
+      const result = [
+        "openrouter/free",
+        ...discovered,
+      ];
 
-      return candidates;
+      return [
+        ...new Set(result),
+      ];
     }
 
-    // ==========================================================
-    // CALL OPENROUTER
-    // ==========================================================
+    // =========================================================
+    // CALL ONE SPECIFIC MODEL
+    // =========================================================
 
     async function callModel(
       model,
-      messages
+      messages,
+      options = {}
     ) {
-      const response =
-        await fetch(
-          OPENROUTER_URL,
-          {
-            method: "POST",
+      const controller =
+        new AbortController();
 
-            headers: {
-              Authorization:
-                `Bearer ${env.OPENROUTER_KEY}`,
-              "Content-Type":
-                "application/json",
-
-              "HTTP-Referer":
-                "https://autonomouswork-directory.pages.dev/",
-
-              "X-Title":
-                "Autonomous Work Space",
-            },
-
-            body: JSON.stringify({
-              model,
-
-              messages,
-
-              temperature: 0.2,
-
-              max_tokens: 12000,
-
-              response_format: {
-                type: "json_object",
-              },
-            }),
-          }
+      const timeout =
+        setTimeout(
+          () => {
+            controller.abort();
+          },
+          MODEL_TIMEOUT_MS
         );
-
-      const rawText =
-        await response.text();
-
-      if (!response.ok) {
-        throw new Error(
-          `OpenRouter ${response.status}: ${rawText.slice(
-            0,
-            500
-          )}`
-        );
-      }
-
-      let data;
 
       try {
-        data =
-          JSON.parse(rawText);
+        const payload = {
+          model,
+
+          messages,
+
+          temperature:
+            options.temperature ??
+            0.2,
+
+          max_tokens:
+            options.max_tokens ??
+            7000,
+
+          response_format: {
+            type: "json_object",
+          },
+
+          provider: {
+            allow_fallbacks: true,
+          },
+        };
+
+        const response =
+          await fetch(
+            OPENROUTER_URL,
+            {
+              method: "POST",
+
+              headers: {
+                Authorization:
+                  `Bearer ${env.OPENROUTER_KEY}`,
+
+                "Content-Type":
+                  "application/json",
+
+                "HTTP-Referer":
+                  "https://autonomouswork.space",
+
+                "X-Title":
+                  "Autonomous Work Space",
+              },
+
+              body:
+                JSON.stringify(
+                  payload
+                ),
+
+              signal:
+                controller.signal,
+            }
+          );
+
+        const rawText =
+          await response.text();
+
+        let data;
+
+        try {
+          data =
+            JSON.parse(
+              rawText
+            );
+        } catch {
+          throw new Error(
+            `OpenRouter returned non-JSON HTTP response (${response.status}).`
+          );
+        }
+
+        if (!response.ok) {
+          const message =
+            data?.error?.message ||
+            data?.error?.metadata?.raw ||
+            `OpenRouter HTTP ${response.status}`;
+
+          throw new Error(
+            message
+          );
+        }
+
+        const content =
+          extractContent(
+            data
+          );
+
+        const parsed =
+          extractJSON(
+            content
+          );
+
+        return {
+          success: true,
+
+          modelRequested:
+            model,
+
+          modelUsed:
+            data?.model ||
+            model,
+
+          data:
+            parsed,
+        };
       } catch (err) {
-        throw new Error(
-          "OpenRouter returned invalid JSON."
+        if (
+          err?.name ===
+          "AbortError"
+        ) {
+          throw new Error(
+            `Model timeout after ${MODEL_TIMEOUT_MS / 1000}s: ${model}`
+          );
+        }
+
+        throw err;
+      } finally {
+        clearTimeout(
+          timeout
         );
       }
-
-      if (
-        !data.choices ||
-        !data.choices[0] ||
-        !data.choices[0].message
-      ) {
-        throw new Error(
-          "OpenRouter returned no usable message."
-        );
-      }
-
-      let content =
-        data.choices[0].message.content;
-
-      // Some models return content blocks.
-      if (Array.isArray(content)) {
-        content =
-          content
-            .map((part) => {
-              if (
-                typeof part ===
-                "string"
-              ) {
-                return part;
-              }
-
-              if (
-                part &&
-                typeof part.text ===
-                  "string"
-              ) {
-                return part.text;
-              }
-
-              return "";
-            })
-            .join("");
-      }
-
-      const parsed =
-        extractJSON(content);
-
-      if (!parsed) {
-        throw new Error(
-          "Model response could not be parsed as JSON."
-        );
-      }
-
-      return parsed;
     }
 
-    // ==========================================================
-    // RUN LLM WITH FREE-MODEL FALLBACK
-    // ==========================================================
+    // =========================================================
+    // SMART LLM ROUTER
+    //
+    // FIRST:
+    // OpenRouter native fallback.
+    //
+    // SECOND:
+    // Manual free-model recovery.
+    //
+    // This gives us two layers of protection.
+    // =========================================================
 
-    async function runLLM(messages) {
-      const models =
+    async function runLLM(
+      messages,
+      options = {}
+    ) {
+      const candidates =
         await getModelCandidates();
+
+      const primary =
+        candidates[0] ||
+        "openrouter/free";
+
+      const fallbackModels =
+        candidates.slice(1);
 
       const attempts = [];
 
-      let lastError = null;
+      // =======================================================
+      // PASS 1
+      //
+      // Let OpenRouter handle model fallback.
+      // =======================================================
 
-      const limit =
-        Math.min(
-          models.length,
-          MAX_MODEL_ATTEMPTS
+      try {
+        const controller =
+          new AbortController();
+
+        const timeout =
+          setTimeout(
+            () => {
+              controller.abort();
+            },
+            MODEL_TIMEOUT_MS
+          );
+
+        try {
+          const payload = {
+            model:
+              primary,
+
+            models:
+              fallbackModels,
+
+            messages,
+
+            temperature:
+              options.temperature ??
+              0.2,
+
+            max_tokens:
+              options.max_tokens ??
+              7000,
+
+            response_format: {
+              type: "json_object",
+            },
+
+            provider: {
+              allow_fallbacks:
+                true,
+            },
+          };
+
+          const response =
+            await fetch(
+              OPENROUTER_URL,
+              {
+                method: "POST",
+
+                headers: {
+                  Authorization:
+                    `Bearer ${env.OPENROUTER_KEY}`,
+
+                  "Content-Type":
+                    "application/json",
+
+                  "HTTP-Referer":
+                    "https://autonomouswork.space",
+
+                  "X-Title":
+                    "Autonomous Work Space",
+                },
+
+                body:
+                  JSON.stringify(
+                    payload
+                  ),
+
+                signal:
+                  controller.signal,
+              }
+            );
+
+          const rawText =
+            await response.text();
+
+          let data;
+
+          try {
+            data =
+              JSON.parse(
+                rawText
+              );
+          } catch {
+            throw new Error(
+              `OpenRouter returned invalid HTTP JSON (${response.status}).`
+            );
+          }
+
+          if (!response.ok) {
+            const message =
+              data?.error?.message ||
+              data?.error?.metadata?.raw ||
+              `OpenRouter HTTP ${response.status}`;
+
+            throw new Error(
+              message
+            );
+          }
+
+          const content =
+            extractContent(
+              data
+            );
+
+          const parsed =
+            extractJSON(
+              content
+            );
+
+          return {
+            success: true,
+
+            data:
+              parsed,
+
+            modelUsed:
+              data?.model ||
+              primary,
+
+            modelAttempts:
+              candidates.length,
+
+            attemptedModels:
+              candidates,
+
+            nativeFallback:
+              true,
+
+            manualRecovery:
+              false,
+          };
+        } finally {
+          clearTimeout(
+            timeout
+          );
+        }
+      } catch (nativeError) {
+        attempts.push({
+          stage:
+            "native_fallback",
+
+          error:
+            cleanText(
+              nativeError.message
+            ),
+        });
+      }
+
+      // =======================================================
+      // PASS 2
+      //
+      // Manual model-by-model recovery.
+      //
+      // This is especially useful if a model technically
+      // responds but produces invalid JSON.
+      // =======================================================
+
+      const manualCandidates =
+        candidates.filter(
+          (model) =>
+            model !== primary
         );
 
       for (
-        let i = 0;
-        i < limit;
-        i++
+        const model of manualCandidates
       ) {
-        const model =
-          models[i];
-
         try {
           const result =
             await callModel(
               model,
-              messages
+              messages,
+              options
             );
 
           return {
-            result,
-            model,
-            attempts:
-              attempts.length + 1,
-            errors: attempts,
+            ...result,
+
+            modelAttempts:
+              candidates.length,
+
+            attemptedModels:
+              candidates,
+
+            nativeFallback:
+              false,
+
+            manualRecovery:
+              true,
+
+            previousErrors:
+              attempts,
           };
         } catch (err) {
-          lastError = err;
-
           attempts.push({
+            stage:
+              "manual_recovery",
+
             model,
+
             error:
-              err.message,
+              cleanText(
+                err.message
+              ),
           });
         }
       }
 
       throw new Error(
-        `All free models failed. Last error: ${
-          lastError
-            ? lastError.message
-            : "Unknown error"
-        }`
+        JSON.stringify({
+          message:
+            "All available free OpenRouter models failed.",
+
+          attempts,
+        })
       );
     }
 
-    // ==========================================================
-    // PHASE 1 — GOAL ANALYSIS
-    // ==========================================================
+    // =========================================================
+    // PHASE 1
+    // GOAL INTELLIGENCE
+    // =========================================================
 
     const plannerSystem = `
-You are the intelligence layer of Autonomous Work Space.
+You are the Goal Intelligence Planner for Autonomous Work Space.
 
-Your job is to deeply understand the user's goal and determine what
-an autonomous workspace would need in order to accomplish it.
+Your job is to deeply understand the user's desired outcome before selecting tools or agents.
 
 IMPORTANT:
 
-There is NO Airtable catalog available to you.
-
-You are NOT restricted to any predefined ecosystem.
-
-Use your own knowledge of the AI ecosystem to identify relevant:
-
-- AI agents
-- AI tools
-- automation systems
-- orchestration systems
-- APIs
-- databases
-- memory systems
-- browser agents
-- coding agents
-- research systems
-- communication tools
-- infrastructure
-- monitoring
-- integrations
-- productivity systems
-- other technologies
-
-Do not build the final stack yet.
-
-First determine the capabilities required.
+- Do NOT use Airtable.
+- Do NOT assume a fixed internal directory.
+- Do NOT assume the ecosystem is limited to known tools.
+- Think about the broader external AI/software ecosystem.
+- Focus on capabilities rather than merely product names.
+- Identify what must happen for the user's goal to succeed.
+- Identify constraints and dependencies.
+- Think in terms of autonomous work.
 
 Return ONLY valid JSON.
 
-Use exactly this structure:
+Required structure:
 
 {
-  "goal_interpretation": "",
-  "primary_outcome": "",
+  "goal": "",
+  "goal_type": "",
+  "desired_outcome": "",
   "required_capabilities": [],
   "workflow_requirements": [],
-  "important_constraints": [],
-  "component_types_needed": [],
-  "research_direction": []
+  "constraints": [],
+  "likely_agent_roles": [],
+  "likely_tool_roles": [],
+  "critical_dependencies": [],
+  "success_criteria": [],
+  "unknowns": []
 }
 `;
 
-    let planning;
-
-    try {
-      const plannerResult =
-        await runLLM([
-          {
-            role: "system",
-            content:
-              plannerSystem,
-          },
-          {
-            role: "user",
-            content: `
-USER GOAL:
-
-${goal}
-
-Analyze the goal deeply.
-
-Determine what an autonomous workspace would actually need.
-
-Do not build the final stack yet.
-`,
-          },
-        ]);
-
-      planning =
-        plannerResult.result;
-    } catch (err) {
-      return jsonResponse(
-        {
-          error:
-            "Goal analysis failed.",
-          details:
-            err.message,
-        },
-        500
-      );
-    }
-
-    // ==========================================================
-    // PHASE 2 — INITIAL ARCHITECTURE
-    // ==========================================================
+    // =========================================================
+    // PHASE 2
+    // INITIAL ARCHITECTURE
+    // =========================================================
 
     const architectureSystem = `
-You are the primary autonomous workspace architect for
-Autonomous Work Space.
+You are the Autonomous Work Space Architect.
 
-Design a practical workspace that can accomplish the user's goal.
+Build an autonomous system architecture for the user's goal.
 
 IMPORTANT:
 
-There is NO Airtable catalog.
-
-You are NOT limited to a supplied list.
-
-Use your own knowledge of the wider AI ecosystem to identify suitable
-agents, tools, platforms, APIs, automation systems, infrastructure
-and other useful components.
-
-The user wants an actual solution, not a generic list.
-
-Every component must have a meaningful role.
-
-Do not invent products.
-
-If you are uncertain about a product, state the uncertainty rather
-than presenting invented information as fact.
-
-For each component provide:
-
-- name
-- type
-- category
-- role
-- capability
-- reason
-- known URL when known
-- limitations
+- Airtable is NOT the source of available tools.
+- Do NOT limit the architecture to an internal directory.
+- Think about the entire external AI/software ecosystem.
+- Identify appropriate agent roles.
+- Identify appropriate tool roles.
+- Identify integrations.
+- Identify infrastructure.
+- Identify automation.
+- Identify data flow.
+- Specific external products may be suggested where useful.
+- Never claim a product has a capability without reasonable confidence.
+- Separate required components from optional components.
+- Avoid unnecessary complexity.
+- Design something that could realistically be implemented.
 
 Return ONLY valid JSON.
 
-Use this structure:
+Required structure:
 
 {
-  "workspace_name": "",
-  "goal": "",
-  "goal_interpretation": "",
   "architecture_summary": "",
-  "required_capabilities": [],
-  "components": [
+  "system_objective": "",
+
+  "layers": [
     {
       "name": "",
-      "type": "",
-      "category": "",
-      "role": "",
-      "capability": "",
-      "reason": "",
-      "url": "",
-      "limitations": ""
+      "purpose": "",
+      "components": [],
+      "reason": ""
     }
   ],
-  "workflow": [],
-  "dependencies": [],
-  "capability_coverage": [],
+
+  "agents": [
+    {
+      "name": "",
+      "role": "",
+      "reason": "",
+      "required_capabilities": [],
+      "suggested_external_options": []
+    }
+  ],
+
+  "tools": [
+    {
+      "name": "",
+      "role": "",
+      "reason": "",
+      "required_capabilities": [],
+      "suggested_external_options": []
+    }
+  ],
+
+  "integrations": [],
+  "data_flow": [],
+  "automation_flow": [],
+  "human_touchpoints": [],
+  "security_considerations": [],
+  "scalability_considerations": [],
   "capability_gaps": [],
-  "implementation_notes": [],
   "recommendations": []
 }
-
-The architecture_summary must explain how the components work
-together to accomplish the goal.
 `;
 
-    let initialArchitecture;
-
-    try {
-      const architectureResult =
-        await runLLM([
-          {
-            role: "system",
-            content:
-              architectureSystem,
-          },
-          {
-            role: "user",
-            content: `
-USER GOAL:
-
-${goal}
-
-GOAL ANALYSIS:
-
-${JSON.stringify(
-  planning,
-  null,
-  2
-)}
-
-Now design the initial autonomous workspace.
-
-Think independently about the wider AI ecosystem.
-Do not restrict yourself to any catalog.
-`,
-          },
-        ]);
-
-      initialArchitecture =
-        architectureResult.result;
-    } catch (err) {
-      return jsonResponse(
-        {
-          error:
-            "Initial architecture generation failed.",
-          details:
-            err.message,
-          planning,
-        },
-        500
-      );
-    }
-
-    // ==========================================================
-    // PHASE 3 — SELF REVIEW
-    // ==========================================================
+    // =========================================================
+    // PHASE 3
+    // SELF REVIEW
+    // =========================================================
 
     const reviewSystem = `
-You are the independent quality-control architect for
-Autonomous Work Space.
+You are the Self-Review Architect for Autonomous Work Space.
 
-Review the proposed workspace against the user's actual goal.
+Review the proposed architecture against the original user's goal.
 
-Do NOT simply praise it.
+Be critical and practical.
 
 Look for:
 
 - missing capabilities
-- unnecessary components
-- duplicated functionality
-- weak components
-- missing automation
-- missing orchestration
+- redundant components
+- weak workflow links
+- unnecessary complexity
 - missing integrations
-- missing memory
-- missing data handling
-- missing human handoffs
-- reliability issues
+- missing human approvals
+- security issues
 - scalability issues
-- security considerations
+- failure points
+- components that do not actually contribute
+- manual steps that should be automated
+- places where an agent or tool is missing
 - unrealistic assumptions
-- components that do not meaningfully contribute
+
+Do NOT merely praise the architecture.
 
 Return ONLY valid JSON.
 
-Use this structure:
+Required structure:
 
 {
   "summary": "",
   "strengths": [],
+  "weaknesses": [],
+  "missing_capabilities": [],
+  "redundancies": [],
+  "failure_points": [],
+  "security_concerns": [],
+  "scalability_concerns": [],
   "improvements": [],
-  "capability_coverage": [],
-  "capability_gaps": [
-    {
-      "gap": "",
-      "why_it_matters": "",
-      "required_capability": "",
-      "possible_solution_types": []
-    }
-  ],
-  "unnecessary_components": [],
-  "risks": [],
-  "overall_assessment": ""
+  "priority_gaps": []
 }
 `;
 
-    let review;
-
-    try {
-      const reviewResult =
-        await runLLM([
-          {
-            role: "system",
-            content:
-              reviewSystem,
-          },
-          {
-            role: "user",
-            content: `
-USER GOAL:
-
-${goal}
-
-PROPOSED ARCHITECTURE:
-
-${JSON.stringify(
-  initialArchitecture,
-  null,
-  2
-)}
-
-Perform a rigorous independent review.
-
-Find real capability gaps.
-`,
-          },
-        ]);
-
-      review =
-        reviewResult.result;
-    } catch (err) {
-      return jsonResponse(
-        {
-          error:
-            "Architecture self-review failed.",
-          details:
-            err.message,
-          planning,
-          architecture:
-            initialArchitecture,
-        },
-        500
-      );
-    }
-
-    // ==========================================================
-    // PHASE 4 — GAP SOLVER
-    // ==========================================================
+    // =========================================================
+    // PHASE 4
+    // GAP SOLVER
+    // =========================================================
 
     const gapSolverSystem = `
-You are the autonomous gap-solving layer of
-Autonomous Work Space.
+You are the Gap-Solving Architect for Autonomous Work Space.
 
-The workspace has already been designed and reviewed.
+The architecture has already been reviewed.
 
-Your task is to solve the identified capability gaps.
+Your job is to solve the identified gaps.
 
 IMPORTANT:
 
-There is NO Airtable catalog.
-
-You are free to consider the wider AI ecosystem.
-
-For every important gap:
-
-1. Determine whether an existing component can solve it.
-2. If yes, explain how.
-3. If not, identify a suitable additional component.
-4. Consider agents, tools, platforms, APIs, automation systems,
-   infrastructure and processes.
-5. Avoid unnecessary components.
-6. Do not invent products.
-7. State uncertainty where appropriate.
+- Do not blindly add components.
+- Only add a component when it solves a real requirement.
+- Think across the broader external AI/software ecosystem.
+- Suggest external agents, tools or services when they materially solve a gap.
+- Do not use Airtable as a discovery source.
+- Do not assume a component exists simply because its name sounds suitable.
+- Prefer simple solutions when they are sufficient.
 
 Return ONLY valid JSON.
 
-Structure:
+Required structure:
 
 {
-  "gap_solutions": [
+  "gap_analysis": [
     {
       "gap": "",
-      "solution_type":
-        "existing_component | new_component | process_change",
-      "existing_component": "",
-      "new_component": {
-        "name": "",
-        "type": "",
-        "category": "",
-        "role": "",
-        "capability": "",
-        "reason": "",
-        "url": "",
-        "limitations": ""
-      },
-      "solution": ""
+      "severity": "",
+      "solution": "",
+      "required_component_type": "",
+      "candidate_external_options": [],
+      "reason": ""
     }
   ],
-  "additional_components": [],
-  "remaining_gaps": []
+
+  "components_to_add": [],
+  "components_to_remove": [],
+  "components_to_modify": [],
+  "workflow_changes": [],
+  "integration_changes": [],
+  "final_requirements": []
 }
 `;
 
-    let gapSolutions;
-
-    try {
-      const gapResult =
-        await runLLM([
-          {
-            role: "system",
-            content:
-              gapSolverSystem,
-          },
-          {
-            role: "user",
-            content: `
-USER GOAL:
-
-${goal}
-
-CURRENT ARCHITECTURE:
-
-${JSON.stringify(
-  initialArchitecture,
-  null,
-  2
-)}
-
-SELF-REVIEW:
-
-${JSON.stringify(
-  review,
-  null,
-  2
-)}
-
-Now solve the important capability gaps.
-
-Do not assume the current architecture is sufficient.
-`,
-          },
-        ]);
-
-      gapSolutions =
-        gapResult.result;
-    } catch (err) {
-      return jsonResponse(
-        {
-          error:
-            "Gap-solving phase failed.",
-          details:
-            err.message,
-          planning,
-          architecture:
-            initialArchitecture,
-          review,
-        },
-        500
-      );
-    }
-
-    // ==========================================================
-    // PHASE 5 — FINAL REBUILD
-    // ==========================================================
+    // =========================================================
+    // PHASE 5
+    // FINAL REBUILD
+    // =========================================================
 
     const rebuildSystem = `
-You are the final autonomous workspace architect for
-Autonomous Work Space.
+You are the Final Autonomous Work Space Architect.
 
-Rebuild the workspace after the planning, architecture,
-self-review and gap-solving phases.
+Rebuild the architecture using:
+
+1. Original user goal.
+2. Goal intelligence plan.
+3. Initial architecture.
+4. Self-review.
+5. Gap-solving analysis.
+
+This is the final architecture.
 
 IMPORTANT:
 
-There is NO Airtable catalog.
-
-The final architecture should be based on the user's goal and the
-best components you can identify from your own knowledge.
-
-Combine useful existing components with valid gap solutions.
-
-Remove unnecessary components.
-
-Do not make the stack larger merely for appearance.
-
-Every component must have a clear purpose.
-
-Explain:
-
-- what each component does
-- why it is needed
-- how components connect
-- how the workflow operates
-- what automation happens
-- where humans are involved
-- remaining limitations
-- remaining capability gaps
-
-Do not invent products or URLs.
+- Airtable is NOT an input.
+- Do not make Airtable a dependency.
+- Do not mention Airtable as part of the architecture.
+- Think about the broader external ecosystem.
+- Remove unnecessary components.
+- Add missing components only when justified.
+- Make the architecture practical.
+- Clearly explain why each major component exists.
+- Identify realistic external agents/tools/services where appropriate.
+- Keep the workflow coherent.
+- Do not over-engineer the system.
 
 Return ONLY valid JSON.
 
-Use exactly this structure:
+Required structure:
 
 {
-  "workspace_name": "",
-  "goal": "",
-  "goal_interpretation": "",
   "architecture_summary": "",
-  "components": [
+  "system_objective": "",
+
+  "layers": [
     {
       "name": "",
-      "type": "",
-      "category": "",
-      "role": "",
-      "capability": "",
-      "reason": "",
-      "url": "",
-      "limitations": ""
+      "purpose": "",
+      "components": [],
+      "reason": ""
     }
   ],
-  "workflow": [],
-  "dependencies": [],
-  "capability_coverage": [],
-  "capability_gaps": [],
-  "implementation_notes": [],
-  "recommendations": [],
-  "review": {
-    "summary": "",
-    "improvements": []
-  }
-}
 
-The architecture_summary must explain the actual system architecture
-and how it accomplishes the user's goal.
+  "agents": [
+    {
+      "name": "",
+      "role": "",
+      "purpose": "",
+      "required_capabilities": [],
+      "suggested_external_options": [],
+      "reason": ""
+    }
+  ],
+
+  "tools": [
+    {
+      "name": "",
+      "role": "",
+      "purpose": "",
+      "required_capabilities": [],
+      "suggested_external_options": [],
+      "reason": ""
+    }
+  ],
+
+  "integrations": [],
+
+  "data_flow": [],
+
+  "automation_flow": [],
+
+  "human_touchpoints": [],
+
+  "security_considerations": [],
+
+  "scalability_considerations": [],
+
+  "capability_gaps": [],
+
+  "recommendations": [],
+
+  "external_recommendations": []
+}
 `;
 
-    let finalArchitecture;
-
-    try {
-      const rebuildResult =
-        await runLLM([
-          {
-            role: "system",
-            content:
-              rebuildSystem,
-          },
-          {
-            role: "user",
-            content: `
-USER GOAL:
-
-${goal}
-
-GOAL ANALYSIS:
-
-${JSON.stringify(
-  planning,
-  null,
-  2
-)}
-
-INITIAL ARCHITECTURE:
-
-${JSON.stringify(
-  initialArchitecture,
-  null,
-  2
-)}
-
-SELF-REVIEW:
-
-${JSON.stringify(
-  review,
-  null,
-  2
-)}
-
-GAP-SOLVING RESULTS:
-
-${JSON.stringify(
-  gapSolutions,
-  null,
-  2
-)}
-
-Now rebuild the final autonomous workspace.
-
-The final architecture should actually address the important gaps
-identified during the review.
-`,
-          },
-        ]);
-
-      finalArchitecture =
-        rebuildResult.result;
-    } catch (err) {
-      return jsonResponse(
-        {
-          error:
-            "Final architecture rebuild failed.",
-          details:
-            err.message,
-          planning,
-          architecture:
-            initialArchitecture,
-          review,
-          gapSolutions,
-        },
-        500
-      );
-    }
-
-    // ==========================================================
-    // PHASE 6 — FINAL QUALITY REVIEW
-    // ==========================================================
+    // =========================================================
+    // PHASE 6
+    // FINAL QUALITY REVIEW
+    // =========================================================
 
     const finalReviewSystem = `
-You are the final quality-control reviewer for
-Autonomous Work Space.
+You are the Final Quality Controller for Autonomous Work Space.
 
-Review the final architecture against the original user goal.
+Review the final architecture against the original user's goal.
 
 Check:
 
-- important requirements covered
-- meaningful component roles
-- coherent workflow
-- realistic implementation
-- unnecessary components
-- remaining capability gaps
-- implementation risks
-- questionable or uncertain component claims
+1. Does every important user requirement have a capability?
+2. Are the agents actually useful?
+3. Are the tools actually useful?
+4. Are integrations logical?
+5. Is the workflow executable?
+6. Are there obvious missing capabilities?
+7. Are there unnecessary components?
+8. Are there security concerns?
+9. Is the system scalable?
+10. Could a real user reasonably implement it?
 
-Do NOT redesign the architecture.
+Do not redesign everything unless necessary.
 
 Return ONLY valid JSON.
 
-Structure:
+Required structure:
 
 {
-  "summary": "",
-  "strengths": [],
-  "improvements": [],
+  "overall_assessment": "",
+  "goal_coverage": "",
+  "critical_missing_items": [],
   "remaining_gaps": [],
+  "unnecessary_items": [],
   "implementation_risks": [],
-  "overall_assessment": ""
+  "final_improvements": [],
+  "ready_for_implementation": true
 }
 `;
 
-    let finalReview;
+    // =========================================================
+    // BUILD STATE
+    // =========================================================
 
-    try {
-      const finalReviewResult =
-        await runLLM([
-          {
-            role: "system",
-            content:
-              finalReviewSystem,
-          },
-          {
-            role: "user",
-            content: `
-ORIGINAL USER GOAL:
-
-${goal}
-
-FINAL ARCHITECTURE:
-
-${JSON.stringify(
-  finalArchitecture,
-  null,
-  2
-)}
-
-Perform the final quality review.
-`,
-          },
-        ]);
-
-      finalReview =
-        finalReviewResult.result;
-    } catch (err) {
-      finalReview = {
-        summary:
-          "Final review could not be completed.",
-        strengths: [],
-        improvements: [],
-        remaining_gaps: [],
-        implementation_risks: [
-          err.message,
-        ],
-        overall_assessment:
-          "Architecture generated, but final QA was unavailable.",
-      };
-    }
-
-    // ==========================================================
-    // ATTACH REVIEW TO FINAL ARCHITECTURE
-    // ==========================================================
-
-    finalArchitecture.review = {
-      summary:
-        finalReview.summary || "",
-
-      improvements:
-        Array.isArray(
-          finalReview.improvements
-        )
-          ? finalReview.improvements
-          : [],
-    };
-
-    finalArchitecture.final_quality_review =
-      finalReview;
-
-    // ==========================================================
-    // BUILDER METADATA
-    // ==========================================================
-
-    finalArchitecture.builder_metadata = {
-      mode: "LLM-only",
-      airtable_used: false,
-      external_search_api_used: false,
-
-      planning_completed: true,
-      initial_architecture_completed:
-        true,
-      self_review_completed: true,
-      gap_solving_completed: true,
-      final_rebuild_completed: true,
-      final_quality_review_completed:
-        true,
-    };
-
-    // ==========================================================
-    // FINAL RESPONSE
-    // ==========================================================
-
-    return jsonResponse({
-      success: true,
+    const buildState = {
+      success: false,
 
       goal,
 
-      architecture:
-        finalArchitecture,
+      stage:
+        "starting",
 
-      planning,
+      completedStages: [],
 
-      initial_architecture:
-        initialArchitecture,
+      modelUsage: [],
+    };
 
-      self_review:
-        review,
+    // =========================================================
+    // EXECUTE BUILDER
+    // =========================================================
 
-      gap_solutions:
-        gapSolutions,
+    try {
+      // =======================================================
+      // PHASE 1
+      // =======================================================
 
-      final_quality_review:
-        finalReview,
+      buildState.stage =
+        "goal_understanding";
 
-      message:
-        "Workspace generated using the LLM-only autonomous architecture flow.",
-    });
+      const planningResult =
+        await runLLM(
+          [
+            {
+              role:
+                "system",
+
+              content:
+                plannerSystem,
+            },
+
+            {
+              role:
+                "user",
+
+              content:
+                `USER GOAL:\n${goal}`,
+            },
+          ],
+          {
+            max_tokens:
+              5000,
+
+            temperature:
+              0.2,
+          }
+        );
+
+      const planning =
+        planningResult.data;
+
+      buildState.completedStages.push(
+        "goal_understanding"
+      );
+
+      buildState.modelUsage.push({
+        stage:
+          "goal_understanding",
+
+        model:
+          planningResult.modelUsed,
+      });
+
+      // =======================================================
+      // PHASE 2
+      // =======================================================
+
+      buildState.stage =
+        "initial_architecture";
+
+      const architectureResult =
+        await runLLM(
+          [
+            {
+              role:
+                "system",
+
+              content:
+                architectureSystem,
+            },
+
+            {
+              role:
+                "user",
+
+              content:
+                JSON.stringify(
+                  {
+                    user_goal:
+                      goal,
+
+                    planning:
+                      planning,
+                  },
+                  null,
+                  2
+                ),
+            },
+          ],
+          {
+            max_tokens:
+              6500,
+
+            temperature:
+              0.25,
+          }
+        );
+
+      const initialArchitecture =
+        architectureResult.data;
+
+      buildState.completedStages.push(
+        "initial_architecture"
+      );
+
+      buildState.modelUsage.push({
+        stage:
+          "initial_architecture",
+
+        model:
+          architectureResult.modelUsed,
+      });
+
+      // =======================================================
+      // PHASE 3
+      // =======================================================
+
+      buildState.stage =
+        "self_review";
+
+      const reviewResult =
+        await runLLM(
+          [
+            {
+              role:
+                "system",
+
+              content:
+                reviewSystem,
+            },
+
+            {
+              role:
+                "user",
+
+              content:
+                JSON.stringify(
+                  {
+                    user_goal:
+                      goal,
+
+                    planning:
+                      planning,
+
+                    architecture:
+                      initialArchitecture,
+                  },
+                  null,
+                  2
+                ),
+            },
+          ],
+          {
+            max_tokens:
+              5000,
+
+            temperature:
+              0.2,
+          }
+        );
+
+      const selfReview =
+        reviewResult.data;
+
+      buildState.completedStages.push(
+        "self_review"
+      );
+
+      buildState.modelUsage.push({
+        stage:
+          "self_review",
+
+        model:
+          reviewResult.modelUsed,
+      });
+
+      // =======================================================
+      // PHASE 4
+      // =======================================================
+
+      buildState.stage =
+        "gap_solving";
+
+      const gapResult =
+        await runLLM(
+          [
+            {
+              role:
+                "system",
+
+              content:
+                gapSolverSystem,
+            },
+
+            {
+              role:
+                "user",
+
+              content:
+                JSON.stringify(
+                  {
+                    user_goal:
+                      goal,
+
+                    architecture:
+                      initialArchitecture,
+
+                    self_review:
+                      selfReview,
+                  },
+                  null,
+                  2
+                ),
+            },
+          ],
+          {
+            max_tokens:
+              5500,
+
+            temperature:
+              0.2,
+          }
+        );
+
+      const gapSolutions =
+        gapResult.data;
+
+      buildState.completedStages.push(
+        "gap_solving"
+      );
+
+      buildState.modelUsage.push({
+        stage:
+          "gap_solving",
+
+        model:
+          gapResult.modelUsed,
+      });
+
+      // =======================================================
+      // PHASE 5
+      // =======================================================
+
+      buildState.stage =
+        "final_rebuild";
+
+      const rebuildResult =
+        await runLLM(
+          [
+            {
+              role:
+                "system",
+
+              content:
+                rebuildSystem,
+            },
+
+            {
+              role:
+                "user",
+
+              content:
+                JSON.stringify(
+                  {
+                    user_goal:
+                      goal,
+
+                    planning:
+                      planning,
+
+                    initial_architecture:
+                      initialArchitecture,
+
+                    self_review:
+                      selfReview,
+
+                    gap_solutions:
+                      gapSolutions,
+                  },
+                  null,
+                  2
+                ),
+            },
+          ],
+          {
+            max_tokens:
+              7500,
+
+            temperature:
+              0.2,
+          }
+        );
+
+      const finalArchitecture =
+        rebuildResult.data;
+
+      buildState.completedStages.push(
+        "final_rebuild"
+      );
+
+      buildState.modelUsage.push({
+        stage:
+          "final_rebuild",
+
+        model:
+          rebuildResult.modelUsed,
+      });
+
+      // =======================================================
+      // PHASE 6
+      // =======================================================
+
+      buildState.stage =
+        "final_quality_review";
+
+      const finalReviewResult =
+        await runLLM(
+          [
+            {
+              role:
+                "system",
+
+              content:
+                finalReviewSystem,
+            },
+
+            {
+              role:
+                "user",
+
+              content:
+                JSON.stringify(
+                  {
+                    user_goal:
+                      goal,
+
+                    final_architecture:
+                      finalArchitecture,
+                  },
+                  null,
+                  2
+                ),
+            },
+          ],
+          {
+            max_tokens:
+              4500,
+
+            temperature:
+              0.2,
+          }
+        );
+
+      const finalQualityReview =
+        finalReviewResult.data;
+
+      buildState.completedStages.push(
+        "final_quality_review"
+      );
+
+      buildState.modelUsage.push({
+        stage:
+          "final_quality_review",
+
+        model:
+          finalReviewResult.modelUsed,
+      });
+
+      // =======================================================
+      // FRONTEND COMPATIBILITY
+      //
+      // These fields are kept because the existing Stack page
+      // expects them.
+      // =======================================================
+
+      finalArchitecture.review =
+        {
+          summary:
+            selfReview?.summary ||
+            finalQualityReview?.overall_assessment ||
+            "",
+
+          improvements:
+            selfReview?.improvements ||
+            finalQualityReview?.final_improvements ||
+            [],
+        };
+
+      finalArchitecture.architecture_summary =
+        finalArchitecture.architecture_summary ||
+        finalArchitecture.system_objective ||
+        "Autonomous architecture generated from the user's goal.";
+
+      finalArchitecture.external_recommendations =
+        finalArchitecture.external_recommendations ||
+        finalArchitecture.recommendations ||
+        [];
+
+      // =======================================================
+      // SUCCESS
+      // =======================================================
+
+      buildState.success =
+        true;
+
+      buildState.stage =
+        "complete";
+
+      return jsonResponse({
+        success:
+          true,
+
+        goal,
+
+        architecture:
+          finalArchitecture,
+
+        planning,
+
+        initial_architecture:
+          initialArchitecture,
+
+        self_review:
+          selfReview,
+
+        gap_solutions:
+          gapSolutions,
+
+        final_quality_review:
+          finalQualityReview,
+
+        builder_metadata: {
+          discovery_mode:
+            "LLM-driven external ecosystem reasoning",
+
+          airtable_used_by_builder:
+            false,
+
+          external_search_api_used:
+            false,
+
+          free_model_routing:
+            "OpenRouter free models",
+
+          native_model_fallback:
+            true,
+
+          manual_model_recovery:
+            true,
+
+          completed_stages:
+            buildState.completedStages,
+
+          model_usage:
+            buildState.modelUsage,
+        },
+
+        message:
+          "Autonomous stack built successfully.",
+      });
+    } catch (err) {
+      // =======================================================
+      // FAILURE
+      //
+      // Return diagnostic information instead of a blank
+      // response so we know exactly where the Builder stopped.
+      // =======================================================
+
+      buildState.success =
+        false;
+
+      let parsedError =
+        null;
+
+      try {
+        parsedError =
+          JSON.parse(
+            err.message
+          );
+      } catch {}
+
+      return jsonResponse(
+        {
+          success:
+            false,
+
+          error:
+            parsedError ||
+            err.message ||
+            "Stack builder failed.",
+
+          goal,
+
+          failed_stage:
+            buildState.stage,
+
+          completed_stages:
+            buildState.completedStages,
+
+          model_usage:
+            buildState.modelUsage,
+
+          message:
+            `Stack builder stopped during: ${buildState.stage}`,
+        },
+        500
+      );
+    }
   },
 };
