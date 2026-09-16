@@ -1,25 +1,24 @@
 export default {
   async fetch(request, env) {
 
-    const corsHeaders = {
+    const cors = {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type",
+      "Access-Control-Allow-Headers": "Content-Type"
     };
 
-    const json = (data, status = 200) =>
+    const out = (data, status = 200) =>
       new Response(
         JSON.stringify(data, null, 2),
         {
           status,
           headers: {
-            ...corsHeaders,
+            ...cors,
             "Content-Type": "application/json",
-            "Cache-Control": "no-store",
-          },
+            "Cache-Control": "no-store"
+          }
         }
       );
-
 
     /*
     ============================================================
@@ -28,23 +27,16 @@ export default {
     */
 
     if (request.method === "OPTIONS") {
-      return new Response(
-        null,
-        {
-          status: 204,
-          headers: corsHeaders,
-        }
-      );
+      return new Response(null, {
+        status: 204,
+        headers: cors
+      });
     }
-
 
     /*
     ============================================================
     GET
-    ============================================================
-
-    GET is ONLY for the public Agents / Tools directory.
-
+    PUBLIC AGENTS / TOOLS DIRECTORY ONLY
     Airtable is NOT used by Build My Stack.
     ============================================================
     */
@@ -54,134 +46,97 @@ export default {
       try {
 
         if (!env.AIRTABLE_TOKEN) {
-
-          return json(
+          return out(
             {
               error:
                 "AIRTABLE_TOKEN is not configured on the Worker."
             },
             500
           );
-
         }
 
-
-        const BASE_ID =
-          "appY6TPhOsmj3dIX8";
-
-        const TABLE_NAME =
-          "Table 1";
-
+        const airtableUrl =
+          "https://api.airtable.com/v0/appY6TPhOsmj3dIX8/" +
+          encodeURIComponent("Table 1") +
+          "?pageSize=100";
 
         const response =
           await fetch(
-            `https://api.airtable.com/v0/${BASE_ID}/${encodeURIComponent(TABLE_NAME)}?pageSize=100`,
+            airtableUrl,
             {
               headers: {
                 Authorization:
                   `Bearer ${env.AIRTABLE_TOKEN}`,
-              },
+                "Content-Type":
+                  "application/json"
+              }
             }
           );
-
 
         const text =
           await response.text();
 
-
         if (!response.ok) {
 
-          return json(
+          return out(
             {
               error:
                 "Failed to fetch the Agents / Tools directory from Airtable.",
-
               airtable_status:
                 response.status,
-
               details:
-                text.slice(0, 1000),
+                text.slice(0, 1000)
             },
             response.status
           );
-
         }
 
-
-        let data;
-
-        try {
-
-          data =
-            JSON.parse(text);
-
-        } catch {
-
-          return json(
-            {
-              error:
-                "Airtable returned invalid JSON."
-            },
-            502
-          );
-
-        }
-
+        const data =
+          JSON.parse(text);
 
         const items =
-          Array.isArray(data.records)
+          (data.records || []).map(
+            record => {
 
-            ? data.records.map(
-                record => {
+              const fields =
+                record.fields || {};
 
-                  const fields =
-                    record.fields || {};
+              return {
+                id:
+                  record.id,
 
-                  return {
+                Name:
+                  fields.Name ||
+                  "Untitled",
 
-                    id:
-                      record.id,
+                Type:
+                  fields.Type ||
+                  "Unknown",
 
-                    Name:
-                      fields.Name ||
-                      "Untitled",
+                Description:
+                  fields.Description ||
+                  "",
 
-                    Type:
-                      fields.Type ||
-                      "Unknown",
+                URL:
+                  fields.URL ||
+                  "",
 
-                    Description:
-                      fields.Description ||
-                      "",
+                Category:
+                  fields.Category ||
+                  "Uncategorized",
 
-                    URL:
-                      fields.URL ||
-                      "",
+                created:
+                  record.createdTime ||
+                  ""
+              };
+            }
+          );
 
-                    Category:
-                      fields.Category ||
-                      "Uncategorized",
-
-                    created:
-                      record.createdTime ||
-                      "",
-                  };
-
-                }
-              )
-
-            : [];
-
-
-        return json(
-          items,
-          200
-        );
-
+        return out(items);
 
       } catch (error) {
 
-        return json(
+        return out(
           {
             error:
               error?.message ||
@@ -189,69 +144,50 @@ export default {
           },
           500
         );
-
       }
-
     }
-
 
     /*
     ============================================================
-    ONLY POST /build-stack
+    POST
+    BUILD MY STACK
     ============================================================
     */
 
     if (request.method !== "POST") {
-
-      return json(
+      return out(
         {
           error:
             "Method not allowed."
         },
         405
       );
-
     }
 
+    const pathname =
+      new URL(request.url).pathname;
 
-    const url =
-      new URL(request.url);
+    if (pathname !== "/build-stack") {
 
-
-    if (
-      url.pathname !==
-      "/build-stack"
-    ) {
-
-      return json(
+      return out(
         {
           error:
             "Unknown endpoint."
         },
         404
       );
-
     }
-
-
-    /*
-    ============================================================
-    OPENROUTER KEY
-    ============================================================
-    */
 
     if (!env.OPENROUTER_KEY) {
 
-      return json(
+      return out(
         {
           error:
             "OPENROUTER_KEY is not configured on the Worker."
         },
         500
       );
-
     }
-
 
     /*
     ============================================================
@@ -268,39 +204,34 @@ export default {
 
     } catch {
 
-      return json(
+      return out(
         {
           error:
             "Invalid JSON request."
         },
         400
       );
-
     }
-
 
     const goal =
       String(
         body?.goal || ""
       ).trim();
 
-
     if (!goal) {
 
-      return json(
+      return out(
         {
           error:
             "A workspace goal is required."
         },
         400
       );
-
     }
-
 
     /*
     ============================================================
-    GET FREE MODELS
+    FREE MODEL DISCOVERY
     ============================================================
     */
 
@@ -310,7 +241,6 @@ export default {
         "openrouter/free"
       ];
 
-
       try {
 
         const response =
@@ -319,108 +249,91 @@ export default {
             {
               headers: {
                 Authorization:
-                  `Bearer ${env.OPENROUTER_KEY}`,
-              },
+                  `Bearer ${env.OPENROUTER_KEY}`
+              }
             }
           );
 
-
         if (!response.ok) {
-
           return models;
-
         }
-
 
         const data =
           await response.json();
 
-
-        const availableModels =
-          Array.isArray(data?.data)
-            ? data.data
-            : [];
-
+        if (!Array.isArray(data.data)) {
+          return models;
+        }
 
         for (
-          const model
-          of availableModels
+          const model of data.data
         ) {
 
           const id =
             String(
               model?.id || ""
-            );
+            ).trim();
 
-
-          const promptPrice =
-            Number(
-              model?.pricing?.prompt ??
-              NaN
-            );
-
-
-          const completionPrice =
-            Number(
-              model?.pricing?.completion ??
-              NaN
-            );
-
-
-          const isFree =
-            id.endsWith(":free") ||
-            (
-              promptPrice === 0 &&
-              completionPrice === 0
-            );
-
-
-          if (
-            id &&
-            isFree &&
-            !models.includes(id)
-          ) {
-
-            models.push(id);
-
+          if (!id) {
+            continue;
           }
 
+          const promptPrice =
+            String(
+              model?.pricing?.prompt ??
+              ""
+            );
+
+          const completionPrice =
+            String(
+              model?.pricing?.completion ??
+              ""
+            );
+
+          const isFreeVariant =
+            id.endsWith(":free");
+
+          const isZeroPriced =
+            promptPrice === "0" &&
+            completionPrice === "0";
+
+          if (
+            isFreeVariant ||
+            isZeroPriced
+          ) {
+
+            if (
+              !models.includes(id)
+            ) {
+              models.push(id);
+            }
+          }
         }
 
-
       } catch {
-
         /*
-        openrouter/free remains available
-        as the first candidate.
+        Keep openrouter/free.
         */
-
       }
 
-
       return models;
-
     }
-
 
     /*
     ============================================================
-    PARSE JSON ARRAY
+    JSON ARRAY EXTRACTION
+    Same philosophy as Python scanner.
     ============================================================
     */
 
-    function parseArray(text) {
+    function extractJsonArray(text) {
 
       if (!text) {
-
         return null;
-
       }
-
 
       let cleaned =
         String(text).trim();
-
 
       /*
       Direct JSON
@@ -428,20 +341,14 @@ export default {
 
       try {
 
-        const parsed =
+        const data =
           JSON.parse(cleaned);
 
-
-        if (
-          Array.isArray(parsed)
-        ) {
-
-          return parsed;
-
+        if (Array.isArray(data)) {
+          return data;
         }
 
       } catch {}
-
 
       /*
       Remove markdown fences
@@ -459,38 +366,30 @@ export default {
           )
           .trim();
 
-
       try {
 
-        const parsed =
+        const data =
           JSON.parse(cleaned);
 
-
-        if (
-          Array.isArray(parsed)
-        ) {
-
-          return parsed;
-
+        if (Array.isArray(data)) {
+          return data;
         }
 
       } catch {}
 
-
       /*
-      Extract array from surrounding text
+      Find first [ and last ]
       */
 
       const start =
         cleaned.indexOf("[");
 
-
       const end =
         cleaned.lastIndexOf("]");
 
-
       if (
         start !== -1 &&
+        end !== -1 &&
         end > start
       ) {
 
@@ -500,6 +399,9 @@ export default {
             end + 1
           );
 
+        /*
+        Remove trailing commas.
+        */
 
         candidate =
           candidate.replace(
@@ -507,190 +409,124 @@ export default {
             "]"
           );
 
+        candidate =
+          candidate.replace(
+            /,\s*}/g,
+            "}"
+          );
 
         try {
 
-          const parsed =
+          const data =
             JSON.parse(candidate);
 
-
-          if (
-            Array.isArray(parsed)
-          ) {
-
-            return parsed;
-
+          if (Array.isArray(data)) {
+            return data;
           }
 
         } catch {}
-
       }
 
-
       return null;
-
     }
-
 
     /*
     ============================================================
-    VALIDATE URL
+    JSON OBJECT EXTRACTION
     ============================================================
     */
 
-    function validUrl(value) {
+    function extractJsonObject(text) {
+
+      if (!text) {
+        return null;
+      }
+
+      let cleaned =
+        String(text).trim();
 
       try {
 
-        const parsed =
-          new URL(
-            String(value || "")
+        const data =
+          JSON.parse(cleaned);
+
+        if (
+          data &&
+          typeof data === "object" &&
+          !Array.isArray(data)
+        ) {
+          return data;
+        }
+
+      } catch {}
+
+      cleaned =
+        cleaned
+          .replace(
+            /^\s*```(?:json)?\s*/i,
+            ""
+          )
+          .replace(
+            /\s*```\s*$/i,
+            ""
+          )
+          .trim();
+
+      try {
+
+        const data =
+          JSON.parse(cleaned);
+
+        if (
+          data &&
+          typeof data === "object" &&
+          !Array.isArray(data)
+        ) {
+          return data;
+        }
+
+      } catch {}
+
+      const start =
+        cleaned.indexOf("{");
+
+      const end =
+        cleaned.lastIndexOf("}");
+
+      if (
+        start !== -1 &&
+        end !== -1 &&
+        end > start
+      ) {
+
+        try {
+
+          return JSON.parse(
+            cleaned.slice(
+              start,
+              end + 1
+            )
           );
 
-
-        return (
-          parsed.protocol ===
-            "http:" ||
-
-          parsed.protocol ===
-            "https:"
-        );
-
-      } catch {
-
-        return false;
-
+        } catch {}
       }
 
+      return null;
     }
-
-
-    /*
-    ============================================================
-    CLEAN COMPONENT
-    ============================================================
-    */
-
-    function cleanComponent(
-      item,
-      expectedType,
-      seen
-    ) {
-
-      if (
-        !item ||
-        typeof item !==
-          "object"
-      ) {
-
-        return null;
-
-      }
-
-
-      const name =
-        String(
-          item.name || ""
-        ).trim();
-
-
-      const description =
-        String(
-          item.description || ""
-        ).trim();
-
-
-      const itemUrl =
-        String(
-          item.url || ""
-        ).trim();
-
-
-      const category =
-        String(
-          item.category || ""
-        ).trim();
-
-
-      if (
-        !name ||
-        !description ||
-        !validUrl(itemUrl)
-      ) {
-
-        return null;
-
-      }
-
-
-      const key =
-        name.toLowerCase();
-
-
-      if (
-        seen.has(key)
-      ) {
-
-        return null;
-
-      }
-
-
-      seen.add(key);
-
-
-      return {
-
-        name,
-
-        type:
-          expectedType,
-
-        category:
-          category ||
-          "General",
-
-        description,
-
-        url:
-          itemUrl,
-
-        availability:
-          String(
-            item.availability ||
-            "Unknown"
-          ).trim(),
-
-        reason:
-          String(
-            item.reason ||
-            ""
-          ).trim(),
-
-      };
-
-    }
-
 
     /*
     ============================================================
     OPENROUTER REQUEST
-    ============================================================
-
-    Deliberately simple.
-
-    This follows the same basic request structure
-    used by the working PythonAnywhere scanner.
-
+    IMPORTANT:
     No response_format.
-    No models fallback array.
+    No tiny max_tokens.
+    Same simple pattern as Python scanner.
     ============================================================
     */
 
-    async function callModel(
+    async function askModel(
       model,
-      prompt,
-      maxTokens
+      prompt
     ) {
 
       try {
@@ -699,12 +535,9 @@ export default {
           await fetch(
             "https://openrouter.ai/api/v1/chat/completions",
             {
-
-              method:
-                "POST",
+              method: "POST",
 
               headers: {
-
                 Authorization:
                   `Bearer ${env.OPENROUTER_KEY}`,
 
@@ -715,63 +548,44 @@ export default {
                   "https://autonomouswork.space",
 
                 "X-Title":
-                  "Autonomous Work Space",
-
+                  "Autonomous Work Space"
               },
 
-
               body:
-                JSON.stringify(
-                  {
+                JSON.stringify({
+                  model,
 
-                    model,
+                  messages: [
+                    {
+                      role:
+                        "system",
 
-                    messages: [
+                      content:
+                        "Return ONLY valid JSON. No markdown. No code fences. No explanation. Only real existing products, projects and official websites. Do not invent products or URLs."
+                    },
 
-                      {
-                        role:
-                          "system",
+                    {
+                      role:
+                        "user",
 
-                        content:
-                          "Return ONLY valid JSON. No markdown. No code fences. No explanation. Do not invent products or URLs.",
-                      },
+                      content:
+                        prompt
+                    }
+                  ],
 
-
-                      {
-                        role:
-                          "user",
-
-                        content:
-                          prompt,
-                      },
-
-                    ],
-
-
-                    temperature:
-                      0.2,
-
-
-                    max_tokens:
-                      maxTokens,
-
-                  }
-                ),
-
+                  temperature:
+                    0.2
+                })
             }
           );
-
 
         const raw =
           await response.text();
 
-
         if (!response.ok) {
 
           return {
-
-            ok:
-              false,
+            ok: false,
 
             reason:
               `HTTP ${response.status}`,
@@ -779,13 +593,10 @@ export default {
             details:
               raw.slice(
                 0,
-                1500
-              ),
-
+                1200
+              )
           };
-
         }
-
 
         let data;
 
@@ -797,9 +608,7 @@ export default {
         } catch {
 
           return {
-
-            ok:
-              false,
+            ok: false,
 
             reason:
               "OpenRouter returned invalid JSON.",
@@ -807,25 +616,16 @@ export default {
             details:
               raw.slice(
                 0,
-                1500
-              ),
-
+                1200
+              )
           };
-
         }
 
-
         let content =
-          data
-            ?.choices
-            ?. [0]
-            ?.message
-            ?.content;
-
+          data?.choices?.[0]?.message?.content;
 
         /*
-        Some models can return content
-        as an array of blocks.
+        Some providers return content blocks.
         */
 
         if (
@@ -841,82 +641,172 @@ export default {
                     typeof part ===
                     "string"
                   ) {
-
                     return part;
-
                   }
 
                   return String(
-                    part?.text ||
-                    ""
+                    part?.text || ""
                   );
-
                 }
               )
               .join("");
-
         }
-
 
         content =
           String(
             content || ""
           ).trim();
 
-
         if (!content) {
 
           return {
-
-            ok:
-              false,
+            ok: false,
 
             reason:
               "Model returned empty content.",
 
             details:
-              JSON.stringify(
-                data
-              ).slice(
+              raw.slice(
                 0,
                 1500
-              ),
-
+              )
           };
-
         }
 
-
         return {
-
-          ok:
-            true,
-
-          content,
-
+          ok: true,
+          content
         };
-
 
       } catch (error) {
 
         return {
-
-          ok:
-            false,
+          ok: false,
 
           reason:
             "OpenRouter request exception.",
 
           details:
             error?.message ||
-            String(error),
-
+            String(error)
         };
-
       }
-
     }
 
+    /*
+    ============================================================
+    CLEAN DISCOVERED COMPONENTS
+    ============================================================
+    */
+
+    function cleanComponents(
+      items,
+      type
+    ) {
+
+      const result = [];
+      const seen = new Set();
+
+      if (
+        !Array.isArray(items)
+      ) {
+        return result;
+      }
+
+      for (
+        const item of items
+      ) {
+
+        if (
+          !item ||
+          typeof item !== "object"
+        ) {
+          continue;
+        }
+
+        const name =
+          String(
+            item.name || ""
+          ).trim();
+
+        const description =
+          String(
+            item.description || ""
+          ).trim();
+
+        const url =
+          String(
+            item.url || ""
+          ).trim();
+
+        const category =
+          String(
+            item.category ||
+            "General"
+          ).trim();
+
+        if (
+          !name ||
+          !description ||
+          !url
+        ) {
+          continue;
+        }
+
+        try {
+
+          const parsed =
+            new URL(url);
+
+          if (
+            ![
+              "http:",
+              "https:"
+            ].includes(
+              parsed.protocol
+            )
+          ) {
+            continue;
+          }
+
+        } catch {
+
+          continue;
+        }
+
+        const key =
+          name.toLowerCase();
+
+        if (
+          seen.has(key)
+        ) {
+          continue;
+        }
+
+        seen.add(key);
+
+        result.push({
+          name,
+          type,
+          category,
+          description,
+          url,
+
+          availability:
+            String(
+              item.availability ||
+              "Unknown"
+            ),
+
+          reason:
+            String(
+              item.reason || ""
+            )
+        });
+      }
+
+      return result;
+    }
 
     /*
     ============================================================
@@ -926,52 +816,71 @@ export default {
 
     async function discoverType(
       type,
-      needed,
       models
     ) {
 
+      const isAgent =
+        type === "Agent";
+
       const categories =
-        type === "Agent"
+        isAgent
+          ? [
+              "Research",
+              "Coding",
+              "Data",
+              "Marketing",
+              "Sales",
+              "Customer Support",
+              "Operations",
+              "Browser",
+              "Development",
+              "Productivity"
+            ]
+          : [
+              "Automation",
+              "Orchestration",
+              "Infrastructure",
+              "Memory",
+              "Database",
+              "Communication",
+              "Development",
+              "Integration",
+              "Monitoring",
+              "Productivity"
+            ];
 
-          ? "Research, Coding, Data, Marketing, Sales, Customer Support, Operations, Browser, Development, Productivity"
+      /*
+      IMPORTANT:
+      Ask for 4 rather than 6.
 
-          : "Automation, Orchestration, Infrastructure, Memory, Database, Communication, Development, Integration, Monitoring, Productivity";
+      This keeps the response comfortably inside
+      free-model output limits while still giving
+      the architecture enough real components.
+      */
 
+      const prompt =
+        `Find 4 real, specific, currently existing ${
+          isAgent
+            ? "AI agents"
+            : "AI tools or workflow platforms"
+        } that are useful for this autonomous workspace goal.
 
-      const prompt = `
-
-Find exactly ${needed} real, specific, currently existing ${
-        type === "Agent"
-          ? "AI agents"
-          : "AI tools or platforms"
-      } that could be useful for autonomous workspaces.
-
-USER'S WORKSPACE GOAL:
-
+GOAL:
 ${goal}
 
-Only return products, platforms, or projects that actually exist.
-
-Use their official website URL.
-
-Do not invent names.
-
-Do not invent products.
-
-Do not invent URLs.
-
-Do not return generic concepts.
-
-Avoid duplicates.
-
-Categories must be exactly one of:
-
-${categories}
+Rules:
+- Only real existing products or open-source projects.
+- Use official websites.
+- Do not invent names.
+- Do not invent URLs.
+- Avoid duplicates.
+- Choose products genuinely relevant to the goal.
+- Categories must be exactly one of:
+${categories.join(", ")}
 
 Return ONLY a JSON array.
 
-Each object must contain:
-
+Each object MUST contain:
 name
 description
 url
@@ -979,474 +888,107 @@ category
 availability
 reason
 
-Keep descriptions short and factual.
+Description: one short factual sentence.
+Reason: one short factual sentence explaining relevance.`;
 
-Keep reasons short and factual.
-
-`;
-
-
-      const failures =
-        [];
-
+      const failures = [];
 
       /*
-      Try openrouter/free first,
-      exactly like the Python scanner approach.
+      First try the official free router.
+
+      Then try individually discovered free models.
       */
 
+      const orderedModels = [
+        "openrouter/free",
+        ...models.filter(
+          model =>
+            model !==
+            "openrouter/free"
+        )
+      ];
+
       for (
-        const model
-        of models.slice(
+        const model of orderedModels.slice(
           0,
           8
         )
       ) {
 
-        const result =
-          await callModel(
+        const response =
+          await askModel(
             model,
-            prompt,
-            2200
+            prompt
           );
 
+        if (!response.ok) {
 
-        if (
-          !result.ok
-        ) {
+          failures.push({
+            model,
+            reason:
+              response.reason,
 
-          failures.push(
-            {
-              model,
-              reason:
-                result.reason,
-              details:
-                result.details,
-            }
-          );
+            details:
+              response.details
+          });
 
           continue;
-
         }
-
 
         const parsed =
-          parseArray(
-            result.content
+          extractJsonArray(
+            response.content
           );
 
-
-        if (!parsed) {
-
-          failures.push(
-            {
-              model,
-              reason:
-                "Could not parse JSON array.",
-              details:
-                result.content.slice(
-                  0,
-                  500
-                ),
-            }
+        const components =
+          cleanComponents(
+            parsed,
+            type
           );
-
-          continue;
-
-        }
-
-
-        const seen =
-          new Set();
-
-
-        const accepted =
-          [];
-
-
-        for (
-          const item
-          of parsed
-        ) {
-
-          const cleaned =
-            cleanComponent(
-              item,
-              type,
-              seen
-            );
-
-
-          if (
-            cleaned
-          ) {
-
-            accepted.push(
-              cleaned
-            );
-
-          }
-
-
-          if (
-            accepted.length >=
-            needed
-          ) {
-
-            break;
-
-          }
-
-        }
-
 
         if (
-          accepted.length
+          components.length
         ) {
 
           return {
-
-            ok:
-              true,
-
             items:
-              accepted,
+              components,
 
             model,
 
-            failures,
-
+            failures
           };
-
         }
 
+        failures.push({
+          model,
 
-        failures.push(
-          {
-            model,
-            reason:
-              "Model returned no valid components.",
-          }
-        );
+          reason:
+            "Model returned content but no valid components could be parsed.",
 
+          details:
+            response.content.slice(
+              0,
+              1000
+            )
+        });
       }
 
-
       return {
-
-        ok:
-          false,
-
-        items:
-          [],
-
-        failures,
-
+        items: [],
+        model: null,
+        failures
       };
-
     }
-
-
-    /*
-    ============================================================
-    BUILD ARCHITECTURE
-    ============================================================
-    */
-
-    async function buildArchitecture(
-      components,
-      models
-    ) {
-
-      const catalog =
-        components.map(
-          item => ({
-
-            name:
-              item.name,
-
-            type:
-              item.type,
-
-            category:
-              item.category,
-
-            description:
-              item.description,
-
-            url:
-              item.url,
-
-          })
-        );
-
-
-      const prompt = `
-
-Build an autonomous workspace architecture for this goal:
-
-${goal}
-
-The following agents and tools were independently discovered through OpenRouter:
-
-${JSON.stringify(
-  catalog
-)}
-
-Use ONLY these discovered components.
-
-Do NOT invent additional products.
-
-Design the architecture around the actual goal.
-
-Do not use a fixed seven-layer template.
-
-Create only the layers actually needed.
-
-Return ONLY one valid JSON object.
-
-Use this structure:
-
-{
-  "goal_summary": "...",
-
-  "core_capabilities": [
-    {
-      "name": "...",
-      "reason": "..."
-    }
-  ],
-
-  "layers": [
-    {
-      "number": 1,
-      "name": "...",
-      "purpose": "...",
-      "why_needed": "...",
-
-      "agents": [
-        {
-          "name": "...",
-          "category": "...",
-          "url": "...",
-          "description": "...",
-          "reason": "..."
-        }
-      ],
-
-      "tools": [
-        {
-          "name": "...",
-          "category": "...",
-          "url": "...",
-          "description": "...",
-          "reason": "..."
-        }
-      ]
-    }
-  ],
-
-  "gaps": [
-    {
-      "capability": "...",
-      "reason": "..."
-    }
-  ],
-
-  "recommendations": [
-    {
-      "capability": "...",
-      "reason": "..."
-    }
-  ],
-
-  "review": {
-    "summary": "...",
-    "improvements": [
-      "..."
-    ]
-  },
-
-  "architecture_summary": "..."
-}
-
-Every selected component must come from the supplied list.
-
-Every selected component must have a concrete reason.
-
-If an important capability cannot be covered, report it in gaps.
-
-Do not invent a product to fill a gap.
-
-`;
-
-
-      const failures =
-        [];
-
-
-      for (
-        const model
-        of models.slice(
-          0,
-          8
-        )
-      ) {
-
-        const result =
-          await callModel(
-            model,
-            prompt,
-            5000
-          );
-
-
-        if (
-          !result.ok
-        ) {
-
-          failures.push(
-            {
-              model,
-              reason:
-                result.reason,
-              details:
-                result.details,
-            }
-          );
-
-          continue;
-
-        }
-
-
-        let architecture =
-          null;
-
-
-        /*
-        First try direct JSON.
-        */
-
-        try {
-
-          architecture =
-            JSON.parse(
-              result.content
-            );
-
-        } catch {}
-
-
-        /*
-        If there is surrounding text,
-        extract the JSON object.
-        */
-
-        if (
-          !architecture
-        ) {
-
-          const start =
-            result.content.indexOf(
-              "{"
-            );
-
-
-          const end =
-            result.content.lastIndexOf(
-              "}"
-            );
-
-
-          if (
-            start !== -1 &&
-            end > start
-          ) {
-
-            try {
-
-              architecture =
-                JSON.parse(
-                  result.content.slice(
-                    start,
-                    end + 1
-                  )
-                );
-
-            } catch {}
-
-          }
-
-        }
-
-
-        if (
-          architecture &&
-          typeof architecture ===
-            "object" &&
-          Array.isArray(
-            architecture.layers
-          )
-        ) {
-
-          return {
-
-            ok:
-              true,
-
-            architecture,
-
-            model,
-
-            failures,
-
-          };
-
-        }
-
-
-        failures.push(
-          {
-            model,
-            reason:
-              "Model returned an invalid architecture object.",
-            details:
-              result.content.slice(
-                0,
-                700
-              ),
-          }
-        );
-
-      }
-
-
-      return {
-
-        ok:
-          false,
-
-        failures,
-
-      };
-
-    }
-
 
     /*
     ============================================================
     FALLBACK ARCHITECTURE
-    ============================================================
-
-    This is only used if discovery succeeded but
-    the architecture-reasoning pass failed.
-
-    This prevents the entire Stack Builder from failing.
+    If architecture reasoning fails, discovery still succeeds.
     ============================================================
     */
 
-    function fallbackArchitecture(
+    function createFallbackArchitecture(
       components
     ) {
 
@@ -1457,7 +999,6 @@ Do not invent a product to fill a gap.
             "Agent"
         );
 
-
       const tools =
         components.filter(
           item =>
@@ -1465,164 +1006,105 @@ Do not invent a product to fill a gap.
             "Tool"
         );
 
-
-      const layers =
-        [];
-
+      const layers = [];
 
       if (
         agents.length
       ) {
 
-        layers.push(
-          {
+        layers.push({
+          number: 1,
 
-            number:
-              1,
+          name:
+            "Autonomous Agents",
 
-            name:
-              "Autonomous Agents",
+          purpose:
+            "Agents discovered specifically for the requested workspace goal.",
 
-            purpose:
-              "Agents that perform the autonomous work required by the workspace.",
+          why_needed:
+            "These agents provide the autonomous execution capabilities required to perform the goal.",
 
-            why_needed:
-              "These agents provide the primary autonomous execution capabilities discovered for the requested goal.",
+          agents:
+            agents.slice(
+              0,
+              4
+            ),
 
-            agents:
-              agents.slice(
-                0,
-                4
-              ),
-
-            tools:
-              [],
-
-          }
-        );
-
+          tools: []
+        });
       }
-
 
       if (
         tools.length
       ) {
 
-        layers.push(
-          {
+        layers.push({
+          number:
+            layers.length + 1,
 
-            number:
-              layers.length + 1,
+          name:
+            "Supporting Tools",
 
-            name:
-              "Workspace Tools",
+          purpose:
+            "Tools discovered to support automation, integration, infrastructure and execution.",
 
-            purpose:
-              "Tools and platforms supporting execution, automation, integration, or infrastructure.",
+          why_needed:
+            "These tools provide supporting capabilities required to operate the autonomous workspace.",
 
-            why_needed:
-              "These tools provide supporting capabilities for operating the autonomous workspace.",
+          agents: [],
 
-            agents:
-              [],
-
-            tools:
-              tools.slice(
-                0,
-                5
-              ),
-
-          }
-        );
-
+          tools:
+            tools.slice(
+              0,
+              5
+            )
+        });
       }
-
 
       return {
 
         goal_summary:
-          `An autonomous workspace assembled around this objective: ${goal}`,
+          `Autonomous workspace designed for: ${goal}`,
 
-        core_capabilities:
-          [
+        core_capabilities: [
 
-            {
-              name:
-                "Autonomous task execution",
+          {
+            name:
+              "Autonomous execution",
 
-              reason:
-                "The workspace requires agents capable of carrying out meaningful work toward the stated objective.",
-            },
+            reason:
+              "The workspace requires agents capable of performing meaningful work toward the stated goal."
+          },
 
-            {
-              name:
-                "Supporting execution",
+          {
+            name:
+              "Supporting automation",
 
-              reason:
-                "The workspace requires tools that help execute, automate, integrate, or support the work.",
-            },
-
-          ],
-
+            reason:
+              "The workspace requires tools that enable automation, integration and reliable execution."
+          }
+        ],
 
         layers,
 
+        gaps: [],
 
-        gaps:
-          layers.length
+        recommendations: [],
 
-            ? []
+        review: {
 
-            : [
+          summary:
+            "The architecture was assembled from independently discovered real agents and tools. No unsupported external products were added.",
 
-                {
-                  capability:
-                    "Usable discovered components",
-
-                  reason:
-                    "The discovery models did not return enough valid components to assemble the workspace.",
-                },
-
-              ],
-
-
-        recommendations:
-          [],
-
-
-        review:
-          {
-
-            summary:
-              "The workspace was assembled from independently discovered components. A deeper architecture reasoning pass was unavailable, so this fallback does not invent relationships or capabilities.",
-
-            improvements:
-              [
-
-                "Run the build again when a free reasoning model is available for a deeper architecture pass.",
-
-              ],
-
-          },
-
+          improvements: [
+            "The architecture can be refined further when additional reasoning capacity is available."
+          ]
+        },
 
         architecture_summary:
-          "The workspace was created independently of Airtable by discovering real agents and tools through OpenRouter free models.",
-
+          "The workspace was created by independently discovering real agents and tools through OpenRouter free models. Airtable was not used as a source for Stack Builder discovery."
       };
-
     }
-
-
-    /*
-    ============================================================
-    START FREE MODEL DISCOVERY
-    ============================================================
-    */
-
-    const models =
-      await getFreeModels();
-
 
     /*
     ============================================================
@@ -1630,13 +1112,14 @@ Do not invent a product to fill a gap.
     ============================================================
     */
 
+    const models =
+      await getFreeModels();
+
     const agentResult =
       await discoverType(
         "Agent",
-        6,
         models
       );
-
 
     /*
     ============================================================
@@ -1647,86 +1130,235 @@ Do not invent a product to fill a gap.
     const toolResult =
       await discoverType(
         "Tool",
-        6,
         models
       );
 
+    const components = [
+      ...agentResult.items,
+      ...toolResult.items
+    ];
 
     /*
     ============================================================
-    COMBINE RESULTS
-    ============================================================
-    */
-
-    const components =
-      [
-
-        ...(agentResult.items || []),
-
-        ...(toolResult.items || []),
-
-      ];
-
-
-    /*
-    ============================================================
-    NOTHING FOUND
+    IF DISCOVERY FAILED
+    RETURN REAL DIAGNOSTIC INFORMATION
     ============================================================
     */
 
     if (
-      !components.length
+      components.length === 0
     ) {
 
-      return json(
+      return out(
         {
+          success: false,
 
           error:
-            "OpenRouter free models did not return any usable agents or tools.",
+            "OpenRouter free-model discovery returned no usable components.",
 
-          agent_failures:
-            agentResult.failures ||
-            [],
+          models_available:
+            models,
 
-          tool_failures:
-            toolResult.failures ||
-            [],
+          agents:
+            agentResult.failures,
 
-          models_tried:
-            models.slice(
-              0,
-              8
-            ),
-
+          tools:
+            toolResult.failures
         },
         502
       );
-
     }
-
 
     /*
     ============================================================
-    BUILD ARCHITECTURE
+    ARCHITECTURE PASS
     ============================================================
     */
 
-    const architectureResult =
-      await buildArchitecture(
-        components,
-        models
+    const catalog =
+      components.map(
+        item => ({
+          name:
+            item.name,
+
+          type:
+            item.type,
+
+          category:
+            item.category,
+
+          description:
+            item.description,
+
+          url:
+            item.url,
+
+          availability:
+            item.availability
+        })
       );
 
+    const architecturePrompt =
+      `Design a practical autonomous workspace for this goal.
 
-    const architecture =
-      architectureResult.ok
+GOAL:
+${goal}
 
-        ? architectureResult.architecture
+AVAILABLE DISCOVERED COMPONENTS:
+${JSON.stringify(
+  catalog
+)}
 
-        : fallbackArchitecture(
-            components
-          );
+Use ONLY the components supplied above.
 
+Return ONLY ONE valid JSON object.
+
+Required structure:
+
+{
+  "goal_summary": "...",
+  "core_capabilities": [
+    {
+      "name": "...",
+      "reason": "..."
+    }
+  ],
+  "layers": [
+    {
+      "number": 1,
+      "name": "...",
+      "purpose": "...",
+      "why_needed": "...",
+      "agents": [],
+      "tools": []
+    }
+  ],
+  "gaps": [
+    {
+      "capability": "...",
+      "reason": "..."
+    }
+  ],
+  "recommendations": [
+    {
+      "capability": "...",
+      "reason": "..."
+    }
+  ],
+  "review": {
+    "summary": "...",
+    "improvements": []
+  },
+  "architecture_summary": "..."
+}
+
+Rules:
+- Design layers from the actual goal.
+- Do not use a fixed template.
+- Select only components that genuinely fit.
+- Do not invent products.
+- Do not invent URLs.
+- Do not invent capabilities.
+- Every selected component must include its actual name, category, URL, description and a reason for selection.
+- Keep the architecture practical.
+- Return JSON only.`;
+
+    let architecture =
+      null;
+
+    let architectureModel =
+      null;
+
+    const architectureFailures =
+      [];
+
+    /*
+    Try free models individually.
+    */
+
+    const architectureModels = [
+      "openrouter/free",
+      ...models.filter(
+        model =>
+          model !==
+          "openrouter/free"
+      )
+    ];
+
+    for (
+      const model of architectureModels.slice(
+        0,
+        6
+      )
+    ) {
+
+      const response =
+        await askModel(
+          model,
+          architecturePrompt
+        );
+
+      if (!response.ok) {
+
+        architectureFailures.push({
+          model,
+          reason:
+            response.reason,
+
+          details:
+            response.details
+        });
+
+        continue;
+      }
+
+      const parsed =
+        extractJsonObject(
+          response.content
+        );
+
+      if (
+        parsed &&
+        Array.isArray(
+          parsed.layers
+        )
+      ) {
+
+        architecture =
+          parsed;
+
+        architectureModel =
+          model;
+
+        break;
+      }
+
+      architectureFailures.push({
+        model,
+
+        reason:
+          "Invalid architecture JSON.",
+
+        details:
+          response.content.slice(
+            0,
+            1200
+          )
+      });
+    }
+
+    /*
+    If reasoning architecture fails,
+    NEVER throw away successful discovery.
+    */
+
+    if (!architecture) {
+
+      architecture =
+        createFallbackArchitecture(
+          components
+        );
+    }
 
     /*
     ============================================================
@@ -1734,53 +1366,39 @@ Do not invent a product to fill a gap.
     ============================================================
     */
 
-    if (
-      !Array.isArray(
+    architecture.goal_summary =
+      typeof architecture.goal_summary ===
+      "string"
+        ? architecture.goal_summary
+        : `Autonomous workspace for: ${goal}`;
+
+    architecture.core_capabilities =
+      Array.isArray(
         architecture.core_capabilities
       )
-    ) {
+        ? architecture.core_capabilities
+        : [];
 
-      architecture.core_capabilities =
-        [];
-
-    }
-
-
-    if (
-      !Array.isArray(
+    architecture.layers =
+      Array.isArray(
         architecture.layers
       )
-    ) {
+        ? architecture.layers
+        : [];
 
-      architecture.layers =
-        [];
-
-    }
-
-
-    if (
-      !Array.isArray(
+    architecture.gaps =
+      Array.isArray(
         architecture.gaps
       )
-    ) {
+        ? architecture.gaps
+        : [];
 
-      architecture.gaps =
-        [];
-
-    }
-
-
-    if (
-      !Array.isArray(
+    architecture.recommendations =
+      Array.isArray(
         architecture.recommendations
       )
-    ) {
-
-      architecture.recommendations =
-        [];
-
-    }
-
+        ? architecture.recommendations
+        : [];
 
     if (
       !architecture.review ||
@@ -1788,39 +1406,24 @@ Do not invent a product to fill a gap.
         "object"
     ) {
 
-      architecture.review =
-        {
-          summary:
-            "",
-          improvements:
-            [],
-        };
-
+      architecture.review = {
+        summary: "",
+        improvements: []
+      };
     }
 
-
-    if (
-      !Array.isArray(
+    architecture.review.improvements =
+      Array.isArray(
         architecture.review.improvements
       )
-    ) {
+        ? architecture.review.improvements
+        : [];
 
-      architecture.review.improvements =
-        [];
-
-    }
-
-
-    if (
-      typeof architecture.architecture_summary !==
+    architecture.architecture_summary =
+      typeof architecture.architecture_summary ===
       "string"
-    ) {
-
-      architecture.architecture_summary =
-        "";
-
-    }
-
+        ? architecture.architecture_summary
+        : "";
 
     /*
     ============================================================
@@ -1828,63 +1431,45 @@ Do not invent a product to fill a gap.
     ============================================================
     */
 
-    return json(
+    return out(
       {
-
-        success:
-          true,
+        success: true,
 
         architecture,
 
+        discovery: {
 
-        discovery:
-          {
+          agents_found:
+            agentResult.items.length,
 
-            agents_found:
-              agentResult.items?.length ||
-              0,
+          tools_found:
+            toolResult.items.length,
 
-            tools_found:
-              toolResult.items?.length ||
-              0,
+          agent_model:
+            agentResult.model,
 
-            agent_model:
-              agentResult.model ||
-              null,
+          tool_model:
+            toolResult.model,
 
-            tool_model:
-              toolResult.model ||
-              null,
+          architecture_model:
+            architectureModel,
 
-            architecture_model:
-              architectureResult.model ||
-              null,
+          mode:
+            "openrouter_free_independent_discovery"
+        },
 
-            mode:
-              "openrouter_free_independent_discovery",
+        failures: {
 
-          },
+          agents:
+            agentResult.failures,
 
+          tools:
+            toolResult.failures,
 
-        failures:
-          {
-
-            agents:
-              agentResult.failures ||
-              [],
-
-            tools:
-              toolResult.failures ||
-              [],
-
-            architecture:
-              architectureResult.failures ||
-              [],
-
-          },
-
+          architecture:
+            architectureFailures
+        }
       }
     );
-
   }
 };
